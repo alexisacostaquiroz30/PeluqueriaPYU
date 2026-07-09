@@ -319,6 +319,16 @@ export default function AdminDashboard({
   const [budgetInput, setBudgetInput] = useState(settings.monthlyVariableBudget ?? 500);
   const [settingsSaved, setSettingsSaved] = useState(false);
 
+  // --- ESTADOS PARA CONFIRMACIÓN INLINE (Evita window.confirm bloqueante en iFrame) ---
+  const [ticketApproveConfirmId, setTicketApproveConfirmId] = useState<string | null>(null);
+  const [ticketRejectConfirmId, setTicketRejectConfirmId] = useState<string | null>(null);
+  const [ticketDirectDeleteConfirmId, setTicketDirectDeleteConfirmId] = useState<string | null>(null);
+  const [fixedDeleteConfirmId, setFixedDeleteConfirmId] = useState<string | null>(null);
+  const [variableDeleteConfirmId, setVariableDeleteConfirmId] = useState<string | null>(null);
+  const [categoryDeleteConfirmId, setCategoryDeleteConfirmId] = useState<string | null>(null);
+  const [serviceDeleteConfirmId, setServiceDeleteConfirmId] = useState<string | null>(null);
+  const [workerDeleteConfirmId, setWorkerDeleteConfirmId] = useState<string | null>(null);
+
   // Sincronizar inputs con configuración externa cuando cambie
   useEffect(() => {
     setCommInput(settings.globalCommissionRate);
@@ -785,28 +795,68 @@ export default function AdminDashboard({
                           )}
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
-                          <button
-                            onClick={() => {
-                              if (window.confirm(`¿Estás seguro de que deseas APROBAR la eliminación de este servicio?\nSe borrará de forma permanente.`)) {
-                                onDeleteTicket(tk.id);
-                              }
-                            }}
-                            className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-xl shadow-sm transition-all flex items-center gap-1 cursor-pointer"
-                          >
-                            <Check className="w-3.5 h-3.5" />
-                            Aprobar
-                          </button>
-                          <button
-                            onClick={() => {
-                              if (window.confirm('¿Deseas RECHAZAR la solicitud de eliminación? El servicio se mantendrá activo.')) {
-                                onRejectDeleteTicket(tk.id);
-                              }
-                            }}
-                            className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-800 text-xs font-semibold rounded-xl transition-all flex items-center gap-1 cursor-pointer"
-                          >
-                            <X className="w-3.5 h-3.5" />
-                            Rechazar
-                          </button>
+                          {ticketApproveConfirmId === tk.id ? (
+                            <div className="flex items-center gap-1.5 bg-red-50 p-1.5 rounded-xl border border-red-200 animate-pulse">
+                              <span className="text-[10px] font-bold text-red-700 px-1">¿Aprobar eliminación?</span>
+                              <button
+                                onClick={() => {
+                                  onDeleteTicket(tk.id);
+                                  setTicketApproveConfirmId(null);
+                                }}
+                                className="px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white text-[10px] font-bold rounded-lg cursor-pointer transition-all"
+                              >
+                                Sí, borrar
+                              </button>
+                              <button
+                                onClick={() => setTicketApproveConfirmId(null)}
+                                className="px-2 py-1 bg-slate-200 hover:bg-slate-300 text-slate-700 text-[10px] font-bold rounded-lg cursor-pointer transition-all"
+                              >
+                                No
+                              </button>
+                            </div>
+                          ) : ticketRejectConfirmId === tk.id ? (
+                            <div className="flex items-center gap-1.5 bg-slate-100 p-1.5 rounded-xl border border-slate-200">
+                              <span className="text-[10px] font-bold text-slate-700 px-1">¿Rechazar petición?</span>
+                              <button
+                                onClick={() => {
+                                  onRejectDeleteTicket(tk.id);
+                                  setTicketRejectConfirmId(null);
+                                }}
+                                className="px-2.5 py-1 bg-slate-700 hover:bg-slate-800 text-white text-[10px] font-bold rounded-lg cursor-pointer transition-all"
+                              >
+                                Sí, mantener
+                              </button>
+                              <button
+                                onClick={() => setTicketRejectConfirmId(null)}
+                                className="px-2 py-1 bg-slate-200 hover:bg-slate-300 text-slate-700 text-[10px] font-bold rounded-lg cursor-pointer transition-all"
+                              >
+                                No
+                              </button>
+                            </div>
+                          ) : (
+                            <>
+                              <button
+                                onClick={() => {
+                                  setTicketApproveConfirmId(tk.id);
+                                  setTicketRejectConfirmId(null);
+                                }}
+                                className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-xl shadow-sm transition-all flex items-center gap-1 cursor-pointer"
+                              >
+                                <Check className="w-3.5 h-3.5" />
+                                Aprobar
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setTicketRejectConfirmId(tk.id);
+                                  setTicketApproveConfirmId(null);
+                                }}
+                                className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-800 text-xs font-semibold rounded-xl transition-all flex items-center gap-1 cursor-pointer"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                                Rechazar
+                              </button>
+                            </>
+                          )}
                         </div>
                       </div>
                     );
@@ -1158,41 +1208,100 @@ export default function AdminDashboard({
                                                       <span className="text-[9px] bg-amber-100 text-amber-800 font-bold px-1.5 py-0.5 rounded truncate max-w-[120px]" title={`Motivo: ${tk.deleteRequestReason}`}>
                                                         Petición: {tk.deleteRequestReason}
                                                       </span>
-                                                      <button
-                                                        onClick={() => {
-                                                          if (window.confirm('¿Aprobar la solicitud de eliminación de este servicio?')) {
-                                                            onDeleteTicket(tk.id);
-                                                          }
-                                                        }}
-                                                        className="px-2 py-0.5 bg-red-600 hover:bg-red-700 text-white text-[10px] font-bold rounded cursor-pointer"
-                                                        title="Aprobar eliminación"
-                                                      >
-                                                        Aprobar
-                                                      </button>
-                                                      <button
-                                                        onClick={() => {
-                                                          if (window.confirm('¿Denegar la solicitud de eliminación?')) {
-                                                            onRejectDeleteTicket(tk.id);
-                                                          }
-                                                        }}
-                                                        className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-600 text-[10px] font-bold rounded cursor-pointer"
-                                                        title="Denegar eliminación"
-                                                      >
-                                                        Denegar
-                                                      </button>
+                                                      {ticketApproveConfirmId === tk.id ? (
+                                                        <div className="flex items-center gap-1 bg-red-50 p-1 rounded border border-red-200 animate-pulse">
+                                                          <button
+                                                            onClick={() => {
+                                                              onDeleteTicket(tk.id);
+                                                              setTicketApproveConfirmId(null);
+                                                            }}
+                                                            className="px-1.5 py-0.5 bg-red-600 text-white text-[9px] font-bold rounded cursor-pointer"
+                                                          >
+                                                            Sí
+                                                          </button>
+                                                          <button
+                                                            onClick={() => setTicketApproveConfirmId(null)}
+                                                            className="px-1.5 py-0.5 bg-slate-200 text-slate-700 text-[9px] font-bold rounded cursor-pointer"
+                                                          >
+                                                            No
+                                                          </button>
+                                                        </div>
+                                                      ) : ticketRejectConfirmId === tk.id ? (
+                                                        <div className="flex items-center gap-1 bg-slate-100 p-1 rounded border border-slate-200">
+                                                          <button
+                                                            onClick={() => {
+                                                              onRejectDeleteTicket(tk.id);
+                                                              setTicketRejectConfirmId(null);
+                                                            }}
+                                                            className="px-1.5 py-0.5 bg-slate-700 text-white text-[9px] font-bold rounded cursor-pointer"
+                                                          >
+                                                            Sí
+                                                          </button>
+                                                          <button
+                                                            onClick={() => setTicketRejectConfirmId(null)}
+                                                            className="px-1.5 py-0.5 bg-slate-200 text-slate-700 text-[9px] font-bold rounded cursor-pointer"
+                                                          >
+                                                            No
+                                                          </button>
+                                                        </div>
+                                                      ) : (
+                                                        <>
+                                                          <button
+                                                            onClick={() => {
+                                                              setTicketApproveConfirmId(tk.id);
+                                                              setTicketRejectConfirmId(null);
+                                                            }}
+                                                            className="px-2 py-0.5 bg-red-600 hover:bg-red-700 text-white text-[10px] font-bold rounded cursor-pointer"
+                                                            title="Aprobar eliminación"
+                                                          >
+                                                            Aprobar
+                                                          </button>
+                                                          <button
+                                                            onClick={() => {
+                                                              setTicketRejectConfirmId(tk.id);
+                                                              setTicketApproveConfirmId(null);
+                                                            }}
+                                                            className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-600 text-[10px] font-bold rounded cursor-pointer"
+                                                            title="Denegar eliminación"
+                                                          >
+                                                            Denegar
+                                                          </button>
+                                                        </>
+                                                      )}
                                                     </div>
                                                   ) : (
-                                                    <button
-                                                      onClick={() => {
-                                                        if (window.confirm('¿Estás seguro de que deseas eliminar este servicio de manera directa?')) {
-                                                          onDeleteTicket(tk.id);
-                                                        }
-                                                      }}
-                                                      className="p-1 text-slate-400 hover:text-red-500 rounded hover:bg-slate-100 transition-all cursor-pointer inline-flex items-center"
-                                                      title="Eliminar servicio directamente"
-                                                    >
-                                                      <Trash2 className="w-3.5 h-3.5" />
-                                                    </button>
+                                                    <div className="flex items-center justify-center">
+                                                      {ticketDirectDeleteConfirmId === tk.id ? (
+                                                        <div className="flex items-center gap-1 bg-red-50 p-1 rounded border border-red-200">
+                                                          <span className="text-[9px] text-red-700 font-bold px-0.5">¿Borrar?</span>
+                                                          <button
+                                                            onClick={() => {
+                                                              onDeleteTicket(tk.id);
+                                                              setTicketDirectDeleteConfirmId(null);
+                                                            }}
+                                                            className="px-1.5 py-0.5 bg-red-600 text-white text-[9px] font-bold rounded cursor-pointer"
+                                                          >
+                                                            Sí
+                                                          </button>
+                                                          <button
+                                                            onClick={() => setTicketDirectDeleteConfirmId(null)}
+                                                            className="px-1.5 py-0.5 bg-slate-200 text-slate-700 text-[9px] font-bold rounded cursor-pointer"
+                                                          >
+                                                            No
+                                                          </button>
+                                                        </div>
+                                                      ) : (
+                                                        <button
+                                                          onClick={() => {
+                                                            setTicketDirectDeleteConfirmId(tk.id);
+                                                          }}
+                                                          className="p-1 text-slate-400 hover:text-red-500 rounded hover:bg-slate-100 transition-all cursor-pointer inline-flex items-center"
+                                                          title="Eliminar servicio directamente"
+                                                        >
+                                                          <Trash2 className="w-3.5 h-3.5" />
+                                                        </button>
+                                                      )}
+                                                    </div>
                                                   )}
                                                 </td>
                                               </tr>

@@ -8,7 +8,7 @@ import { User, Category, Service, ServiceTicket, AppSettings } from '../types';
 import { 
   LogOut, Plus, Calendar, Scissors, Sparkles, DollarSign, 
   TrendingUp, Layers, CheckCircle2, Trash2, Tag, FileText, ClipboardList,
-  AlertTriangle, Clock, X, RotateCcw
+  AlertTriangle, Clock, X, RotateCcw, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -60,6 +60,14 @@ export default function WorkerDashboard({
   // Estado para la solicitud de eliminación de ticket
   const [deleteRequestTicketId, setDeleteRequestTicketId] = useState<string | null>(null);
   const [deleteReason, setDeleteReason] = useState('');
+
+  // Estado para la paginación de la tabla de servicios
+  const [currentPage, setCurrentPage] = useState(1);
+
+  // Resetear página cuando cambia de mes/año o de trabajador
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedMonth, selectedYear, worker.id]);
 
   // Meses en español
   const MONTHS = [
@@ -136,6 +144,15 @@ export default function WorkerDashboard({
 
   // Ordenar tickets por fecha descendente
   const sortedWorkerTickets = [...workerTickets].sort((a, b) => b.date.localeCompare(a.date));
+
+  // Configuración de la paginación para la tabla de servicios
+  const itemsPerPage = 8;
+  const totalPages = Math.ceil(sortedWorkerTickets.length / itemsPerPage);
+  const activePage = Math.min(currentPage, Math.max(1, totalPages));
+  const paginatedTickets = sortedWorkerTickets.slice(
+    (activePage - 1) * itemsPerPage,
+    activePage * itemsPerPage
+  );
 
   // KPIs
   const totalGrossGenerated = workerTickets.reduce((sum, t) => sum + t.price, 0);
@@ -425,7 +442,7 @@ export default function WorkerDashboard({
                     </thead>
                     <tbody className="divide-y divide-slate-50">
                       <AnimatePresence initial={false}>
-                        {sortedWorkerTickets.map((tk) => {
+                        {paginatedTickets.map((tk) => {
                           const dateObj = new Date(tk.date);
                           const formattedDate = !isNaN(dateObj.getTime())
                             ? dateObj.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })
@@ -517,12 +534,58 @@ export default function WorkerDashboard({
                   </table>
                 </div>
 
-                <div className="flex justify-between items-center bg-slate-50 p-3 rounded-xl text-[11px] text-slate-500 font-semibold border border-slate-100">
-                  <span>Mostrando {sortedWorkerTickets.length} servicios</span>
+                <div className="flex flex-col sm:flex-row justify-between items-center bg-slate-50 p-3 rounded-xl text-[11px] text-slate-500 font-semibold border border-slate-100 gap-2">
+                  <span>Total del mes: {sortedWorkerTickets.length} servicios</span>
                   <span className="font-mono text-amber-600">
                     Suma total: {totalGrossGenerated.toFixed(2)}€ (Tu comisión: {totalCommissionEarned.toFixed(2)}€)
                   </span>
                 </div>
+
+                {totalPages > 1 && (
+                  <div className="flex flex-col sm:flex-row items-center justify-between border-t border-slate-100 pt-4 mt-2 gap-4">
+                    <div className="text-xs text-slate-500 font-medium">
+                      Mostrando <span className="font-bold text-slate-700">{(activePage - 1) * itemsPerPage + 1}-{Math.min(activePage * itemsPerPage, sortedWorkerTickets.length)}</span> de{' '}
+                      <span className="font-bold text-slate-700">{sortedWorkerTickets.length}</span> servicios
+                    </div>
+                    
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                        disabled={activePage === 1}
+                        className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-transparent transition-all cursor-pointer bg-white"
+                        title="Página anterior"
+                      >
+                        <ChevronLeft className="w-4 h-4" />
+                      </button>
+
+                      {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                        const isCurrent = page === activePage;
+                        return (
+                          <button
+                            key={page}
+                            onClick={() => setCurrentPage(page)}
+                            className={`w-8 h-8 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                              isCurrent
+                                ? 'bg-amber-500 text-white shadow-sm shadow-amber-500/10'
+                                : 'text-slate-600 hover:bg-slate-50 border border-transparent hover:border-slate-100 bg-white'
+                            }`}
+                          >
+                            {page}
+                          </button>
+                        );
+                      })}
+
+                      <button
+                        onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                        disabled={activePage === totalPages}
+                        className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-transparent transition-all cursor-pointer bg-white"
+                        title="Página siguiente"
+                      >
+                        <ChevronRight className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
