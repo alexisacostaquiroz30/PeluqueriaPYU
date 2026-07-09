@@ -1,0 +1,138 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User account for admin and workers",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "username": { "type": "string" },
+        "name": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "worker"] },
+        "password": { "type": "string" }
+      },
+      "required": ["id", "username", "name", "role"]
+    },
+    "Category": {
+      "title": "Category",
+      "description": "Service categories",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" }
+      },
+      "required": ["id", "name"]
+    },
+    "Service": {
+      "title": "Service",
+      "description": "Salon services under a category",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "categoryId": { "type": "string" },
+        "name": { "type": "string" },
+        "price": { "type": "number" }
+      },
+      "required": ["id", "categoryId", "name", "price"]
+    },
+    "ServiceTicket": {
+      "title": "ServiceTicket",
+      "description": "A ticket for a service performed by a worker",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "workerId": { "type": "string" },
+        "categoryId": { "type": "string" },
+        "serviceId": { "type": "string" },
+        "serviceName": { "type": "string" },
+        "price": { "type": "number" },
+        "commissionRate": { "type": "number" },
+        "date": { "type": "string" },
+        "note": { "type": "string" },
+        "deleteRequested": { "type": "boolean" },
+        "deleteRequestReason": { "type": "string" }
+      },
+      "required": ["id", "workerId", "categoryId", "serviceId", "serviceName", "price", "commissionRate", "date"]
+    },
+    "FixedExpense": {
+      "title": "FixedExpense",
+      "description": "Fixed expenses for the salon",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "concept": { "type": "string" },
+        "amount": { "type": "number" }
+      },
+      "required": ["id", "concept", "amount"]
+    },
+    "VariableExpense": {
+      "title": "VariableExpense",
+      "description": "Variable expenses for the salon",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "concept": { "type": "string" },
+        "amount": { "type": "number" },
+        "date": { "type": "string" }
+      },
+      "required": ["id", "concept", "amount", "date"]
+    },
+    "AppSettings": {
+      "title": "AppSettings",
+      "description": "Global settings for the application",
+      "type": "object",
+      "properties": {
+        "globalCommissionRate": { "type": "number" }
+      },
+      "required": ["globalCommissionRate"]
+    },
+    "AuditLog": {
+      "title": "AuditLog",
+      "description": "Logs of critical operations performed by administrators",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "action": { "type": "string" },
+        "details": { "type": "string" },
+        "timestamp": { "type": "string" }
+      },
+      "required": ["id", "userId", "userName", "action", "details", "timestamp"]
+    }
+  },
+  "firestore": {
+    "users": {
+      "schema": "User",
+      "description": "List of salon users and workers"
+    },
+    "categories": {
+      "schema": "Category",
+      "description": "List of service categories"
+    },
+    "services": {
+      "schema": "Service",
+      "description": "List of salon services"
+    },
+    "tickets": {
+      "schema": "ServiceTicket",
+      "description": "List of performed services (tickets)"
+    },
+    "fixedExpenses": {
+      "schema": "FixedExpense",
+      "description": "List of salon fixed monthly expenses"
+    },
+    "variableExpenses": {
+      "schema": "VariableExpense",
+      "description": "List of salon variable monthly expenses"
+    },
+    "settings": {
+      "schema": "AppSettings",
+      "description": "Global settings of the salon"
+    },
+    "auditLogs": {
+      "schema": "AuditLog",
+      "description": "Audit trail for critical administrator changes"
+    }
+  }
+}
