@@ -477,57 +477,7 @@ export default function Login({ users, onLogin }: LoginProps) {
               </form>
             )}
 
-            {/* Divisor */}
-            <div className="relative my-6">
-              <div className="absolute inset-0 flex items-center" aria-hidden="true">
-                <div className="w-full border-t border-slate-100"></div>
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-white px-3 text-slate-400 font-semibold tracking-wider">
-                  Acceso Rápido de Prueba
-                </span>
-              </div>
-            </div>
 
-            {/* Botones de acceso rápido */}
-            <div className="space-y-4">
-              <div>
-                <div className="text-xs font-semibold text-slate-400 mb-2">Administrador:</div>
-                <button
-                  type="button"
-                  id="btn-quick-admin"
-                  onClick={() => handleQuickLogin(users[0] || { id: 'u-admin', username: 'admin', name: 'Eduardo Castro (Admin)', role: 'admin', password: 'admin123' })}
-                  disabled={loading}
-                  className="w-full py-2 px-3 text-left border border-slate-200 hover:border-amber-500 hover:bg-amber-50/30 text-slate-700 hover:text-amber-800 rounded-xl text-xs transition-all flex items-center justify-between cursor-pointer disabled:opacity-50"
-                >
-                  <span className="font-medium">Eduardo Castro (Admin)</span>
-                  <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-mono">
-                    User: admin / Pass: admin123
-                  </span>
-                </button>
-              </div>
-
-              <div>
-                <div className="text-xs font-semibold text-slate-400 mb-2">Trabajadores de la plantilla:</div>
-                <div className="grid grid-cols-2 gap-2">
-                  {users.slice(1, 5).map((worker) => (
-                    <button
-                      key={worker.id}
-                      type="button"
-                      id={`btn-quick-${worker.username}`}
-                      onClick={() => handleQuickLogin(worker)}
-                      disabled={loading}
-                      className="py-2 px-3 text-left border border-slate-200 hover:border-slate-400 hover:bg-slate-50 text-slate-700 rounded-xl text-xs transition-all flex flex-col gap-0.5 cursor-pointer disabled:opacity-50"
-                    >
-                      <span className="font-medium truncate">{worker.name.split(' ')[0]}</span>
-                      <span className="text-[9px] text-slate-400 font-mono">
-                        User: {worker.username} / Pass: {worker.password || '123456'}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
           </div>
         </motion.div>
       </div>
