@@ -4,11 +4,12 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { User, Category, Service, ServiceTicket, FixedExpense, VariableExpense, AppSettings, AuditLog } from '../types';
+import { User, Category, Service, ServiceTicket, FixedExpense, VariableExpense, AppSettings, AuditLog, PayrollPayment } from '../types';
 import { 
   LogOut, Plus, Calendar, Scissors, Sparkles, DollarSign, 
   TrendingUp, Layers, CheckCircle2, Trash2, Tag, FileText, 
-  Settings, Users, ShoppingBag, Receipt, BarChart3, AlertCircle, AlertTriangle, Edit2, Check, X
+  Settings, Users, ShoppingBag, Receipt, BarChart3, AlertCircle, AlertTriangle, Edit2, Check, X,
+  Search, ChevronLeft, ChevronRight, Filter, Coins, CreditCard
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -28,8 +29,12 @@ interface AdminDashboardProps {
   auditLogs: AuditLog[];
   selectedMonth: number;
   selectedYear: number;
+  payrollPayments: PayrollPayment[];
+  onRegisterPayrollPayment: (payment: Omit<PayrollPayment, 'id'>) => void;
+  onDeletePayrollPayment: (id: string) => void;
   
   // Handlers para Tickets
+  onAddTicket: (ticket: Omit<ServiceTicket, 'id'>) => void;
   onDeleteTicket: (ticketId: string) => void;
   onRejectDeleteTicket: (ticketId: string) => void;
   
@@ -67,7 +72,7 @@ interface AdminDashboardProps {
   onChangeYear: (year: number) => void;
 }
 
-type ActiveTab = 'summary' | 'expenses' | 'services' | 'staff' | 'settings';
+type ActiveTab = 'summary' | 'expenses' | 'services' | 'staff' | 'payroll' | 'settings';
 
 export default function AdminDashboard({
   admin,
@@ -81,6 +86,10 @@ export default function AdminDashboard({
   auditLogs,
   selectedMonth,
   selectedYear,
+  payrollPayments,
+  onRegisterPayrollPayment,
+  onDeletePayrollPayment,
+  onAddTicket,
   onDeleteTicket,
   onRejectDeleteTicket,
   onAddCategory,
@@ -107,8 +116,103 @@ export default function AdminDashboard({
   const [activeTab, setActiveTab] = useState<ActiveTab>('summary');
   const [expandedWorkerId, setExpandedWorkerId] = useState<string | null>(null);
 
+  // --- ESTADOS PARA EL MÓDULO DE NÓMINA (PAGOS BI-MENSUALES / QUINCENALES) ---
+  const [payrollPeriod, setPayrollPeriod] = useState<'first-half' | 'second-half'>(() => {
+    const day = new Date().getDate();
+    return day <= 15 ? 'first-half' : 'second-half';
+  });
+  const [paymentFormWorker, setPaymentFormWorker] = useState<User | null>(null);
+  const [customPayAmount, setCustomPayAmount] = useState<number>(0);
+  const [payNote, setPayNote] = useState('');
+  const [payDate, setPayDate] = useState(() => {
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const dd = String(today.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  });
+
+  // --- ESTADOS PARA BÚSQUEDA Y FILTROS EN EL HISTORIAL DE TICKETS ---
+  const [historySearchTerm, setHistorySearchTerm] = useState('');
+  const [historyWorkerFilter, setHistoryWorkerFilter] = useState('all');
+  const [historyDateFilter, setHistoryDateFilter] = useState('all');
+  const [historyCustomStartDate, setHistoryCustomStartDate] = useState('');
+  const [historyCustomEndDate, setHistoryCustomEndDate] = useState('');
+  const [historyCurrentPage, setHistoryCurrentPage] = useState(1);
+
+  // Resetear la página a 1 cuando cambien los filtros
+  useEffect(() => {
+    setHistoryCurrentPage(1);
+  }, [historySearchTerm, historyWorkerFilter, historyDateFilter, historyCustomStartDate, historyCustomEndDate]);
+
   // Solicitudes de eliminación pendientes (Globales de todos los tiempos para que no se pierdan)
   const pendingDeletions = tickets.filter(t => t.deleteRequested);
+
+  // --- ESTADOS PARA REGISTRO DE TICKETS DE TRABAJADOR POR EL ADMINISTRADOR ---
+  const [adminTicketWorkerId, setAdminTicketWorkerId] = useState('');
+  const [adminTicketCategoryId, setAdminTicketCategoryId] = useState('');
+  const [adminTicketServiceId, setAdminTicketServiceId] = useState('');
+  const [adminTicketCustomPrice, setAdminTicketCustomPrice] = useState<number | ''>('');
+  const [adminTicketDate, setAdminTicketDate] = useState(() => {
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const dd = String(today.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  });
+  const [adminTicketNote, setAdminTicketNote] = useState('');
+  const [adminTicketSuccessMessage, setAdminTicketSuccessMessage] = useState('');
+
+  // Filtrar servicios para el formulario de administración
+  const filteredAdminServices = services.filter(s => s.categoryId === adminTicketCategoryId);
+
+  const handleAdminCategoryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const catId = e.target.value;
+    setAdminTicketCategoryId(catId);
+    setAdminTicketServiceId('');
+    setAdminTicketCustomPrice('');
+  };
+
+  const handleAdminServiceChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const srvId = e.target.value;
+    setAdminTicketServiceId(srvId);
+    const service = services.find(s => s.id === srvId);
+    if (service) {
+      setAdminTicketCustomPrice(service.price);
+    } else {
+      setAdminTicketCustomPrice('');
+    }
+  };
+
+  const handleAdminSubmitTicket = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!adminTicketWorkerId || !adminTicketCategoryId || !adminTicketServiceId || adminTicketCustomPrice === '') return;
+
+    const service = services.find(s => s.id === adminTicketServiceId);
+    if (!service) return;
+
+    onAddTicket({
+      workerId: adminTicketWorkerId,
+      categoryId: adminTicketCategoryId,
+      serviceId: adminTicketServiceId,
+      serviceName: service.name,
+      price: Number(adminTicketCustomPrice),
+      commissionRate: settings.globalCommissionRate,
+      date: adminTicketDate,
+      note: adminTicketNote.trim() || undefined,
+    });
+
+    // Resetear formulario
+    setAdminTicketWorkerId('');
+    setAdminTicketCategoryId('');
+    setAdminTicketServiceId('');
+    setAdminTicketCustomPrice('');
+    setAdminTicketNote('');
+    
+    // Mostrar mensaje de éxito
+    setAdminTicketSuccessMessage('¡Servicio registrado con éxito a nombre del estilista!');
+    setTimeout(() => setAdminTicketSuccessMessage(''), 3000);
+  };
 
   // Meses en español
   const MONTHS = [
@@ -202,6 +306,67 @@ export default function AdminDashboard({
 
   // --- DESGLOSE INDIVIDUAL DE EMPLEADOS ---
   const workers = users.filter(u => u.role === 'worker');
+
+  // --- CÁLCULOS DEL PERÍODO DE NÓMINA SELECCIONADO ---
+  const getFilteredPeriodTickets = () => {
+    return tickets.filter(ticket => {
+      const parts = ticket.date.split('-');
+      if (parts.length !== 3) return false;
+      const tYear = parseInt(parts[0], 10);
+      const tMonth = parseInt(parts[1], 10) - 1;
+      const tDay = parseInt(parts[2], 10);
+
+      const matchesYearAndMonth = tYear === selectedYear && tMonth === selectedMonth;
+      if (!matchesYearAndMonth) return false;
+
+      if (payrollPeriod === 'first-half') {
+        return tDay >= 1 && tDay <= 15;
+      } else {
+        return tDay >= 16;
+      }
+    });
+  };
+
+  const periodTickets = getFilteredPeriodTickets();
+
+  // Calcular totales para cada estilista en la quincena
+  const workerPayrollSummaries = workers.map(worker => {
+    const workerTickets = periodTickets.filter(t => t.workerId === worker.id);
+    const servicesCount = workerTickets.length;
+    const totalBilled = workerTickets.reduce((sum, t) => sum + t.price, 0);
+    const totalCommission = workerTickets.reduce((sum, t) => {
+      const rate = t.commissionRate ?? settings.globalCommissionRate;
+      return sum + (t.price * (rate / 100));
+    }, 0);
+
+    const payment = payrollPayments.find(
+      p => p.workerId === worker.id &&
+           p.year === selectedYear &&
+           p.month === selectedMonth &&
+           p.period === payrollPeriod
+    );
+
+    return {
+      worker,
+      servicesCount,
+      totalBilled,
+      totalCommission,
+      payment,
+      isPaid: !!payment
+    };
+  });
+
+  const totalPeriodBilled = workerPayrollSummaries.reduce((sum, s) => sum + s.totalBilled, 0);
+  const totalPeriodCommissions = workerPayrollSummaries.reduce((sum, s) => sum + s.totalCommission, 0);
+  const totalPeriodPaid = payrollPayments
+    .filter(p => p.year === selectedYear && p.month === selectedMonth && p.period === payrollPeriod)
+    .reduce((sum, p) => sum + p.amountPaid, 0);
+  const totalPeriodPending = Math.max(0, totalPeriodCommissions - totalPeriodPaid);
+
+  const registeredPeriodPayments = payrollPayments.filter(
+    p => p.year === selectedYear && p.month === selectedMonth && p.period === payrollPeriod
+  );
+
   const workerSalariesBreakdown = workers.map(worker => {
     const wTickets = monthlyTickets.filter(t => t.workerId === worker.id);
     const gross = wTickets.reduce((sum, t) => sum + t.price, 0);
@@ -217,6 +382,94 @@ export default function AdminDashboard({
       businessShare
     };
   });
+
+  // --- FILTRADO Y PAGINACIÓN DEL HISTORIAL COMPLETO DE TICKETS ---
+  const matchesHistorySearch = (tk: ServiceTicket) => {
+    if (!historySearchTerm) return true;
+    const term = historySearchTerm.toLowerCase().trim();
+    if (tk.serviceName.toLowerCase().includes(term)) return true;
+    if (tk.note && tk.note.toLowerCase().includes(term)) return true;
+    if (tk.price.toString().includes(term)) return true;
+    const worker = users.find(u => u.id === tk.workerId);
+    if (worker && worker.name.toLowerCase().includes(term)) return true;
+    return false;
+  };
+
+  const matchesHistoryWorker = (tk: ServiceTicket) => {
+    if (historyWorkerFilter === 'all') return true;
+    return tk.workerId === historyWorkerFilter;
+  };
+
+  const matchesHistoryDate = (tk: ServiceTicket) => {
+    if (historyDateFilter === 'all') return true;
+    
+    const tkDateStr = tk.date; // YYYY-MM-DD
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth(); // 0-indexed
+
+    if (historyDateFilter === 'this-month') {
+      const parts = tkDateStr.split('-');
+      const y = parseInt(parts[0], 10);
+      const m = parseInt(parts[1], 10) - 1;
+      return y === currentYear && m === currentMonth;
+    }
+    
+    if (historyDateFilter === 'last-month') {
+      const parts = tkDateStr.split('-');
+      const y = parseInt(parts[0], 10);
+      const m = parseInt(parts[1], 10) - 1;
+      let targetMonth = currentMonth - 1;
+      let targetYear = currentYear;
+      if (targetMonth < 0) {
+        targetMonth = 11;
+        targetYear--;
+      }
+      return y === targetYear && m === targetMonth;
+    }
+
+    if (historyDateFilter === 'last-3-months') {
+      const parts = tkDateStr.split('-');
+      const y = parseInt(parts[0], 10);
+      const m = parseInt(parts[1], 10) - 1;
+      const tkMs = new Date(y, m, 1).getTime();
+      const limitMs = new Date(currentYear, currentMonth - 2, 1).getTime();
+      return tkMs >= limitMs;
+    }
+
+    if (historyDateFilter === 'this-year') {
+      const parts = tkDateStr.split('-');
+      const y = parseInt(parts[0], 10);
+      return y === currentYear;
+    }
+
+    if (historyDateFilter === 'custom') {
+      if (!historyCustomStartDate && !historyCustomEndDate) return true;
+      let startMatch = true;
+      let endMatch = true;
+      if (historyCustomStartDate) {
+        startMatch = tkDateStr >= historyCustomStartDate;
+      }
+      if (historyCustomEndDate) {
+        endMatch = tkDateStr <= historyCustomEndDate;
+      }
+      return startMatch && endMatch;
+    }
+
+    return true;
+  };
+
+  const filteredHistoryTickets = [...tickets]
+    .filter(tk => matchesHistorySearch(tk) && matchesHistoryWorker(tk) && matchesHistoryDate(tk))
+    .sort((a, b) => b.date.localeCompare(a.date));
+
+  const historyItemsPerPage = 10;
+  const historyTotalPages = Math.ceil(filteredHistoryTickets.length / historyItemsPerPage);
+  const activeHistoryPage = Math.min(historyCurrentPage, Math.max(1, historyTotalPages));
+  const paginatedHistoryTickets = filteredHistoryTickets.slice(
+    (activeHistoryPage - 1) * historyItemsPerPage,
+    activeHistoryPage * historyItemsPerPage
+  );
 
   // --- COMPILACIÓN DE DATOS MENSUALES PARA EL GRÁFICO (RECHARTS) ---
   const monthlyDataForYear = MONTHS.map((monthName, index) => {
@@ -698,6 +951,19 @@ export default function AdminDashboard({
         </button>
 
         <button
+          onClick={() => setActiveTab('payroll')}
+          className={`px-5 py-3 text-sm font-semibold whitespace-nowrap border-b-2 transition-all flex items-center gap-2 cursor-pointer ${
+            activeTab === 'payroll' 
+              ? 'border-amber-500 text-amber-600' 
+              : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300'
+          }`}
+          id="admin-payroll-tab-button"
+        >
+          <Coins className="w-4 h-4 text-amber-500" />
+          <span className="font-semibold text-slate-700">Nómina y Pagos</span>
+        </button>
+
+        <button
           onClick={() => setActiveTab('settings')}
           className={`px-5 py-3 text-sm font-semibold whitespace-nowrap border-b-2 transition-all flex items-center gap-2 cursor-pointer ${
             activeTab === 'settings' 
@@ -864,6 +1130,161 @@ export default function AdminDashboard({
                 </div>
               </div>
             )}
+
+            {/* Formulario de registro de tickets por el administrador */}
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6" id="admin-add-ticket-card">
+              <div className="flex items-center gap-2.5 pb-4 mb-6 border-b border-slate-100">
+                <Sparkles className="w-5 h-5 text-amber-500" />
+                <div>
+                  <h3 className="font-display font-bold text-slate-800 text-base">
+                    Registrar Servicio en Nombre de Estilista
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    Añade un ticket de servicio directamente para cualquier estilista del salón.
+                  </p>
+                </div>
+              </div>
+
+              {adminTicketSuccessMessage && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex items-center gap-2 p-3 mb-5 rounded-lg bg-green-50 text-green-600 text-xs border border-green-100 font-medium"
+                >
+                  <CheckCircle2 className="w-4 h-4 shrink-0" />
+                  <span>{adminTicketSuccessMessage}</span>
+                </motion.div>
+              )}
+
+              <form onSubmit={handleAdminSubmitTicket} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                
+                {/* 1. Selección de Estilista */}
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                    Estilista / Colaborador
+                  </label>
+                  <select
+                    required
+                    value={adminTicketWorkerId}
+                    onChange={(e) => setAdminTicketWorkerId(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 cursor-pointer"
+                  >
+                    <option value="">Selecciona un estilista...</option>
+                    {workers.map((w) => (
+                      <option key={w.id} value={w.id}>
+                        {w.name} (@{w.username})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* 2. Selección de Categoría */}
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                    Categoría
+                  </label>
+                  <select
+                    required
+                    value={adminTicketCategoryId}
+                    onChange={handleAdminCategoryChange}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 cursor-pointer"
+                  >
+                    <option value="">Selecciona una categoría...</option>
+                    {categories.map((cat) => (
+                      <option key={cat.id} value={cat.id}>{cat.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* 3. Selección de Servicio */}
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                    Servicio Realizado
+                  </label>
+                  <select
+                    required
+                    disabled={!adminTicketCategoryId}
+                    value={adminTicketServiceId}
+                    onChange={handleAdminServiceChange}
+                    className="w-full bg-slate-50 border border-slate-200 disabled:opacity-60 rounded-xl px-3.5 py-2.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 cursor-pointer"
+                  >
+                    <option value="">
+                      {!adminTicketCategoryId 
+                        ? 'Primero selecciona una categoría...' 
+                        : 'Selecciona un servicio...'}
+                    </option>
+                    {filteredAdminServices.map((srv) => (
+                      <option key={srv.id} value={srv.id}>
+                        {srv.name} ({srv.price.toFixed(2)}€)
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* 4. Importe Cobrado (€) */}
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                    Importe Cobrado (€)
+                  </label>
+                  <div className="relative">
+                    <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400 text-sm font-mono font-medium">
+                      €
+                    </span>
+                    <input
+                      type="number"
+                      step="0.01"
+                      required
+                      min="0"
+                      disabled={!adminTicketServiceId}
+                      placeholder="0.00"
+                      value={adminTicketCustomPrice}
+                      onChange={(e) => setAdminTicketCustomPrice(e.target.value === '' ? '' : Number(e.target.value))}
+                      className="w-full pl-8 pr-4 py-2.5 bg-slate-50 border border-slate-200 disabled:opacity-60 rounded-xl text-sm font-mono text-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
+                    />
+                  </div>
+                </div>
+
+                {/* 5. Fecha del Servicio */}
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                    Fecha del Servicio
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={adminTicketDate}
+                    onChange={(e) => setAdminTicketDate(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 font-mono"
+                  />
+                </div>
+
+                {/* 6. Nota / Detalle */}
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                    Nota / Detalle (Opcional)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="ej. Nombre de cliente, detalle técnico..."
+                    value={adminTicketNote}
+                    onChange={(e) => setAdminTicketNote(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
+                  />
+                </div>
+
+                {/* Botón de envío ocupando todo el ancho en md/lg */}
+                <div className="md:col-span-2 lg:col-span-3 pt-2">
+                  <button
+                    type="submit"
+                    className="w-full py-3 bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white font-semibold rounded-xl transition-all shadow-md shadow-amber-500/10 flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Registrar Servicio en Nombre de Estilista</span>
+                  </button>
+                </div>
+
+              </form>
+            </div>
 
             {/* Gráfico Recharts de Comparativa Mensual de Ingresos y Gastos */}
             <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm" id="recharts-monthly-comparison">
@@ -1337,6 +1758,334 @@ export default function AdminDashboard({
                   </p>
                 </div>
               </div>
+            </div>
+
+            {/* HISTORIAL COMPLETO Y BÚSQUEDA DE TICKETS DE SERVICIO */}
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
+              <div className="flex flex-col md:flex-row md:items-center justify-between pb-4 mb-6 border-b border-slate-100 gap-4">
+                <div className="flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-amber-500" />
+                  <div>
+                    <h3 className="font-display font-bold text-slate-800 text-base">
+                      Buscador de Historial de Servicios
+                    </h3>
+                    <p className="text-[11px] text-slate-400">
+                      Busca y filtra tickets de cualquier fecha para localizar registros antiguos.
+                    </p>
+                  </div>
+                </div>
+                <div className="text-[10px] bg-amber-50 text-amber-800 font-bold px-2.5 py-1 rounded-full whitespace-nowrap self-start md:self-auto">
+                  {filteredHistoryTickets.length} registros encontrados
+                </div>
+              </div>
+
+              {/* Controles de Búsqueda y Filtro */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                {/* 1. Entrada de Búsqueda */}
+                <div className="relative">
+                  <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Search className="w-4 h-4 text-slate-400" />
+                  </span>
+                  <input
+                    type="text"
+                    value={historySearchTerm}
+                    onChange={(e) => setHistorySearchTerm(e.target.value)}
+                    placeholder="Buscar servicio, nota, precio o estilista..."
+                    className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 placeholder-slate-400"
+                  />
+                  {historySearchTerm && (
+                    <button
+                      onClick={() => setHistorySearchTerm('')}
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 text-xs font-bold"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+
+                {/* 2. Filtro de Estilista */}
+                <div className="relative">
+                  <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Users className="w-4 h-4 text-slate-400" />
+                  </span>
+                  <select
+                    value={historyWorkerFilter}
+                    onChange={(e) => setHistoryWorkerFilter(e.target.value)}
+                    className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 appearance-none cursor-pointer"
+                  >
+                    <option value="all">Todos los Estilistas</option>
+                    {workers.map(w => (
+                      <option key={w.id} value={w.id}>{w.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* 3. Filtro de Fecha (Preestablecido) */}
+                <div className="relative">
+                  <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Calendar className="w-4 h-4 text-slate-400" />
+                  </span>
+                  <select
+                    value={historyDateFilter}
+                    onChange={(e) => setHistoryDateFilter(e.target.value)}
+                    className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 appearance-none cursor-pointer"
+                  >
+                    <option value="all">Cualquier fecha</option>
+                    <option value="this-month">Este mes</option>
+                    <option value="last-month">Mes pasado</option>
+                    <option value="last-3-months">Últimos 3 meses</option>
+                    <option value="this-year">Este año</option>
+                    <option value="custom">Rango personalizado...</option>
+                  </select>
+                </div>
+
+                {/* 4. Rango Personalizado de Fechas (Si aplica) */}
+                {historyDateFilter === 'custom' ? (
+                  <div className="flex gap-2 items-center">
+                    <input
+                      type="date"
+                      value={historyCustomStartDate}
+                      onChange={(e) => setHistoryCustomStartDate(e.target.value)}
+                      className="w-1/2 p-2 bg-slate-50 border border-slate-200 rounded-xl text-[10px] text-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
+                    />
+                    <span className="text-slate-400 text-xs">a</span>
+                    <input
+                      type="date"
+                      value={historyCustomEndDate}
+                      onChange={(e) => setHistoryCustomEndDate(e.target.value)}
+                      className="w-1/2 p-2 bg-slate-50 border border-slate-200 rounded-xl text-[10px] text-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
+                    />
+                  </div>
+                ) : (
+                  <div className="hidden lg:flex text-slate-400 text-xs items-center justify-center italic bg-slate-50/50 rounded-xl border border-dashed border-slate-200 text-center py-2 px-3">
+                    Filtros rápidos activos
+                  </div>
+                )}
+              </div>
+
+              {/* Tabla de Resultados */}
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="border-b border-slate-100 text-[10px] text-slate-400 uppercase font-bold tracking-wider">
+                      <th className="py-3 px-2">Fecha</th>
+                      <th className="py-3 px-2">Estilista</th>
+                      <th className="py-3 px-2">Servicio</th>
+                      <th className="py-3 px-2 text-right">Precio</th>
+                      <th className="py-3 px-2 text-center">Comisión %</th>
+                      <th className="py-3 px-2 text-right">Pago</th>
+                      <th className="py-3 px-2 text-center">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {paginatedHistoryTickets.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="py-8 text-center text-slate-400 italic">
+                          No se encontraron tickets con los filtros actuales.
+                        </td>
+                      </tr>
+                    ) : (
+                      paginatedHistoryTickets.map((tk) => {
+                        const dateObj = new Date(tk.date);
+                        const formattedDate = !isNaN(dateObj.getTime())
+                          ? dateObj.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })
+                          : tk.date;
+                        const payoutValue = tk.price * (tk.commissionRate / 100);
+                        const isPending = !!tk.deleteRequested;
+                        const workerObj = users.find(u => u.id === tk.workerId);
+
+                        return (
+                          <tr key={tk.id} className={`hover:bg-slate-50/70 transition-colors ${isPending ? 'bg-amber-50/45' : ''}`}>
+                            <td className="py-3 px-2 font-mono whitespace-nowrap text-slate-600">{formattedDate}</td>
+                            <td className="py-3 px-2">
+                              <div className="flex items-center gap-1.5">
+                                <span className="w-5 h-5 rounded-full bg-amber-100 text-amber-800 flex items-center justify-center font-bold text-[9px] uppercase">
+                                  {workerObj ? workerObj.name.charAt(0) : '?'}
+                                </span>
+                                <div>
+                                  <div className="font-semibold text-slate-700 text-xs">
+                                    {workerObj ? workerObj.name : 'Estilista Eliminado'}
+                                  </div>
+                                  <div className="text-[9px] text-slate-400">
+                                    @{workerObj ? workerObj.username : 'desconocido'}
+                                  </div>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="py-3 px-2">
+                              <div className="font-semibold text-slate-700">{tk.serviceName}</div>
+                              {tk.note && <div className="text-[10px] text-slate-400 italic">Nota: {tk.note}</div>}
+                            </td>
+                            <td className="py-3 px-2 text-right font-mono font-medium text-slate-700">{tk.price.toFixed(2)}€</td>
+                            <td className="py-3 px-2 text-center font-mono text-slate-400">{tk.commissionRate}%</td>
+                            <td className="py-3 px-2 text-right font-mono font-bold text-amber-600">{payoutValue.toFixed(2)}€</td>
+                            <td className="py-3 px-2 text-center">
+                              {isPending ? (
+                                <div className="flex items-center justify-center gap-1.5">
+                                  <span className="text-[9px] bg-amber-100 text-amber-800 font-bold px-1.5 py-0.5 rounded truncate max-w-[120px]" title={`Motivo: ${tk.deleteRequestReason}`}>
+                                    Petición: {tk.deleteRequestReason}
+                                  </span>
+                                  {ticketApproveConfirmId === tk.id ? (
+                                    <div className="flex items-center gap-1 bg-red-50 p-1 rounded border border-red-200 animate-pulse">
+                                      <button
+                                        onClick={() => {
+                                          onDeleteTicket(tk.id);
+                                          setTicketApproveConfirmId(null);
+                                        }}
+                                        className="px-1.5 py-0.5 bg-red-600 text-white text-[9px] font-bold rounded cursor-pointer"
+                                      >
+                                        Sí
+                                      </button>
+                                      <button
+                                        onClick={() => setTicketApproveConfirmId(null)}
+                                        className="px-1.5 py-0.5 bg-slate-200 text-slate-700 text-[9px] font-bold rounded cursor-pointer"
+                                      >
+                                        No
+                                      </button>
+                                    </div>
+                                  ) : ticketRejectConfirmId === tk.id ? (
+                                    <div className="flex items-center gap-1 bg-slate-100 p-1 rounded border border-slate-200">
+                                      <button
+                                        onClick={() => {
+                                          onRejectDeleteTicket(tk.id);
+                                          setTicketRejectConfirmId(null);
+                                        }}
+                                        className="px-1.5 py-0.5 bg-slate-700 text-white text-[9px] font-bold rounded cursor-pointer"
+                                      >
+                                        Sí
+                                      </button>
+                                      <button
+                                        onClick={() => setTicketRejectConfirmId(null)}
+                                        className="px-1.5 py-0.5 bg-slate-200 text-slate-700 text-[9px] font-bold rounded cursor-pointer"
+                                      >
+                                        No
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <>
+                                      <button
+                                        onClick={() => {
+                                          setTicketApproveConfirmId(tk.id);
+                                          setTicketRejectConfirmId(null);
+                                        }}
+                                        className="px-2 py-0.5 bg-red-600 hover:bg-red-700 text-white text-[10px] font-bold rounded cursor-pointer"
+                                        title="Aprobar eliminación"
+                                      >
+                                        Aprobar
+                                      </button>
+                                      <button
+                                        onClick={() => {
+                                          setTicketRejectConfirmId(tk.id);
+                                          setTicketApproveConfirmId(null);
+                                        }}
+                                        className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-600 text-[10px] font-bold rounded cursor-pointer"
+                                        title="Denegar eliminación"
+                                      >
+                                        Denegar
+                                      </button>
+                                    </>
+                                  )}
+                                </div>
+                              ) : (
+                                <div className="flex items-center justify-center">
+                                  {ticketDirectDeleteConfirmId === tk.id ? (
+                                    <div className="flex items-center gap-1 bg-red-50 p-1 rounded border border-red-200">
+                                      <span className="text-[9px] text-red-700 font-bold px-0.5">¿Borrar?</span>
+                                      <button
+                                        onClick={() => {
+                                          onDeleteTicket(tk.id);
+                                          setTicketDirectDeleteConfirmId(null);
+                                        }}
+                                        className="px-1.5 py-0.5 bg-red-600 text-white text-[9px] font-bold rounded cursor-pointer"
+                                      >
+                                        Sí
+                                      </button>
+                                      <button
+                                        onClick={() => setTicketDirectDeleteConfirmId(null)}
+                                        className="px-1.5 py-0.5 bg-slate-200 text-slate-700 text-[9px] font-bold rounded cursor-pointer"
+                                      >
+                                        No
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <button
+                                      onClick={() => {
+                                        setTicketDirectDeleteConfirmId(tk.id);
+                                      }}
+                                      className="p-1 text-slate-400 hover:text-red-500 rounded hover:bg-slate-100 transition-all cursor-pointer inline-flex items-center"
+                                      title="Eliminar servicio directamente"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  )}
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Paginación */}
+              {historyTotalPages > 1 && (
+                <div className="flex items-center justify-between border-t border-slate-100 pt-4 mt-4 text-xs">
+                  <div className="text-slate-500">
+                    Mostrando <strong className="font-medium text-slate-700">{(activeHistoryPage - 1) * historyItemsPerPage + 1}</strong> a{' '}
+                    <strong className="font-medium text-slate-700">
+                      {Math.min(activeHistoryPage * historyItemsPerPage, filteredHistoryTickets.length)}
+                    </strong> de{' '}
+                    <strong className="font-medium text-slate-700">{filteredHistoryTickets.length}</strong> resultados
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => setHistoryCurrentPage(prev => Math.max(1, prev - 1))}
+                      disabled={activeHistoryPage === 1}
+                      className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-500 hover:text-slate-800 disabled:opacity-40 transition-all cursor-pointer"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
+                    {Array.from({ length: historyTotalPages }).map((_, idx) => {
+                      const pageNum = idx + 1;
+                      if (
+                        pageNum === 1 ||
+                        pageNum === historyTotalPages ||
+                        Math.abs(pageNum - activeHistoryPage) <= 1
+                      ) {
+                        return (
+                          <button
+                            key={pageNum}
+                            onClick={() => setHistoryCurrentPage(pageNum)}
+                            className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
+                              activeHistoryPage === pageNum
+                                ? 'bg-amber-500 text-white shadow-sm'
+                                : 'border border-slate-200 hover:bg-slate-50 text-slate-600'
+                            }`}
+                          >
+                            {pageNum}
+                          </button>
+                        );
+                      }
+                      if (
+                        pageNum === 2 ||
+                        pageNum === historyTotalPages - 1
+                      ) {
+                        return <span key={pageNum} className="text-slate-400 px-1">...</span>;
+                      }
+                      return null;
+                    })}
+                    <button
+                      onClick={() => setHistoryCurrentPage(prev => Math.min(historyTotalPages, prev + 1))}
+                      disabled={activeHistoryPage === historyTotalPages}
+                      className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-500 hover:text-slate-800 disabled:opacity-40 transition-all cursor-pointer"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </motion.div>
         )}
@@ -2365,6 +3114,452 @@ export default function AdminDashboard({
                 </div>
               )}
             </div>
+          </motion.div>
+        )}
+
+        {/* TAB 6: GESTIÓN DE NÓMINAS Y PAGOS */}
+        {activeTab === 'payroll' && (
+          <motion.div
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -15 }}
+            transition={{ duration: 0.25 }}
+            className="space-y-8 animate-fade-in"
+            id="admin-payroll-content-tab"
+          >
+            {/* Cabecera del Módulo */}
+            <div className="bg-gradient-to-r from-amber-500/10 to-amber-600/5 p-8 rounded-2xl border border-amber-500/10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+              <div>
+                <h2 className="font-display font-extrabold text-2xl text-slate-800 tracking-tight flex items-center gap-2">
+                  <Coins className="w-7 h-7 text-amber-500" />
+                  <span>Módulo de Nómina y Pagos Quincenales</span>
+                </h2>
+                <p className="text-slate-500 text-sm mt-1 max-w-xl">
+                  Calcula las comisiones de servicios realizadas por cada estilista y administra los pagos quincenales del mes de <strong className="text-amber-600 font-semibold">
+                    {['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'][selectedMonth]} de {selectedYear}
+                  </strong>.
+                </p>
+                <p className="text-xs text-slate-400 mt-2 flex items-center gap-1 bg-white/60 w-fit px-2 py-1 rounded-md border border-slate-100">
+                  <Calendar className="w-3 h-3 text-amber-500" />
+                  <span>Usa los selectores de mes/año del panel principal para cambiar el período de liquidación.</span>
+                </p>
+              </div>
+
+              {/* Selector de Período Quincenal */}
+              <div className="bg-white p-1 rounded-xl border border-slate-200/80 flex shadow-sm w-full md:w-auto">
+                <button
+                  onClick={() => setPayrollPeriod('first-half')}
+                  className={`flex-1 md:flex-none px-4 py-2.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                    payrollPeriod === 'first-half'
+                      ? 'bg-amber-500 text-white shadow-md shadow-amber-500/10'
+                      : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'
+                  }`}
+                  id="btn-payroll-period-1"
+                >
+                  <CreditCard className="w-3.5 h-3.5" />
+                  <span>1ª Quincena (Días 1 - 15)</span>
+                </button>
+                <button
+                  onClick={() => setPayrollPeriod('second-half')}
+                  className={`flex-1 md:flex-none px-4 py-2.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                    payrollPeriod === 'second-half'
+                      ? 'bg-amber-500 text-white shadow-md shadow-amber-500/10'
+                      : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'
+                  }`}
+                  id="btn-payroll-period-2"
+                >
+                  <CreditCard className="w-3.5 h-3.5" />
+                  <span>2ª Quincena (Días 16 - Fin)</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Grid de KPIs Quincenales */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {/* Tarjeta 1: Bruto Facturado en el Periodo */}
+              <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm relative overflow-hidden flex flex-col justify-between">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Facturado en el Periodo</span>
+                    <span className="font-display font-black text-2xl text-slate-800 mt-1 block">
+                      {totalPeriodBilled.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
+                    </span>
+                  </div>
+                  <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                    <TrendingUp className="w-5 h-5 text-slate-500" />
+                  </div>
+                </div>
+                <div className="text-slate-400 text-[11px] mt-4 flex items-center gap-1 font-medium">
+                  <span>Total cobrado por servicios en esta quincena.</span>
+                </div>
+              </div>
+
+              {/* Tarjeta 2: Comisión Devengada Total */}
+              <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm relative overflow-hidden flex flex-col justify-between">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Comisiones Acumuladas</span>
+                    <span className="font-display font-black text-2xl text-amber-500 mt-1 block">
+                      {totalPeriodCommissions.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
+                    </span>
+                  </div>
+                  <div className="bg-amber-50 p-2.5 rounded-xl border border-amber-100/50">
+                    <Coins className="w-5 h-5 text-amber-500" />
+                  </div>
+                </div>
+                <div className="text-slate-400 text-[11px] mt-4 flex items-center gap-1 font-medium">
+                  <span>Suma de comisiones devengadas por el personal.</span>
+                </div>
+              </div>
+
+              {/* Tarjeta 3: Total Pagado */}
+              <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm relative overflow-hidden flex flex-col justify-between">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Total Pagado</span>
+                    <span className="font-display font-black text-2xl text-green-600 mt-1 block">
+                      {totalPeriodPaid.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
+                    </span>
+                  </div>
+                  <div className="bg-green-50 p-2.5 rounded-xl border border-green-100/50">
+                    <CheckCircle2 className="w-5 h-5 text-green-600" />
+                  </div>
+                </div>
+                <div className="text-slate-400 text-[11px] mt-4 flex items-center gap-1 font-medium">
+                  <span>Importe de nóminas que ya se han liquidado.</span>
+                </div>
+              </div>
+
+              {/* Tarjeta 4: Pendiente por Pagar */}
+              <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm relative overflow-hidden flex flex-col justify-between">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Monto Pendiente</span>
+                    <span className={`font-display font-black text-2xl mt-1 block ${totalPeriodPending > 0 ? 'text-red-500' : 'text-slate-600'}`}>
+                      {totalPeriodPending.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
+                    </span>
+                  </div>
+                  <div className={`p-2.5 rounded-xl ${totalPeriodPending > 0 ? 'bg-red-50 border border-red-100/50' : 'bg-slate-50 border border-slate-100'}`}>
+                    <AlertTriangle className={`w-5 h-5 ${totalPeriodPending > 0 ? 'text-red-500' : 'text-slate-400'}`} />
+                  </div>
+                </div>
+                <div className="text-slate-400 text-[11px] mt-4 flex items-center gap-1 font-medium">
+                  <span>Importe pendiente por registrar como pago.</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Listado Principal de Trabajadores y Liquidación */}
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+              <div className="p-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                  <h3 className="font-display font-bold text-slate-800 text-base flex items-center gap-2">
+                    <Users className="w-5 h-5 text-amber-500" />
+                    <span>Liquidación de Comisiones por Estilista</span>
+                  </h3>
+                  <p className="text-slate-400 text-xs mt-0.5">
+                    Personal activo para la liquidación del periodo seleccionado.
+                  </p>
+                </div>
+                <span className="text-xs font-bold bg-slate-50 text-slate-500 px-3 py-1.5 rounded-lg border border-slate-100 self-start sm:self-center">
+                  Rango del Periodo: {payrollPeriod === 'first-half' ? `01/${String(selectedMonth + 1).padStart(2, '0')}/${selectedYear} - 15/${String(selectedMonth + 1).padStart(2, '0')}/${selectedYear}` : `16/${String(selectedMonth + 1).padStart(2, '0')}/${selectedYear} - fin de mes`}
+                </span>
+              </div>
+
+              {workerPayrollSummaries.length === 0 ? (
+                <div className="text-center py-16 text-slate-400 font-medium bg-slate-50/50">
+                  <AlertCircle className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+                  <p className="text-sm">No hay estilistas registrados en el sistema.</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-sm">
+                    <thead>
+                      <tr className="bg-slate-50 text-slate-500 uppercase text-[11px] tracking-wider font-bold border-b border-slate-100">
+                        <th className="p-4 pl-6">Estilista</th>
+                        <th className="p-4">Servicios</th>
+                        <th className="p-4 text-right">Facturación Bruta</th>
+                        <th className="p-4 text-right">Comisión Devengada</th>
+                        <th className="p-4 text-center">Estado del Pago</th>
+                        <th className="p-4 pr-6 text-center">Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 font-medium">
+                      {workerPayrollSummaries.map(({ worker, servicesCount, totalBilled, totalCommission, payment, isPaid }) => (
+                        <tr key={worker.id} className="hover:bg-slate-50/50 transition-colors">
+                          <td className="p-4 pl-6">
+                            <div className="flex items-center gap-3">
+                              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-amber-400 to-amber-600 text-white font-display font-extrabold text-sm flex items-center justify-center shadow-sm uppercase">
+                                {worker.name.charAt(0)}
+                              </div>
+                              <div>
+                                <span className="text-slate-800 block text-sm font-bold">{worker.name}</span>
+                                <span className="text-slate-400 text-xs font-mono">{worker.email || worker.username}</span>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="p-4">
+                            <span className="px-2.5 py-1 bg-slate-100 text-slate-700 text-xs font-bold rounded-lg border border-slate-200/50">
+                              {servicesCount} servicios
+                            </span>
+                          </td>
+                          <td className="p-4 text-right font-mono text-slate-700 font-bold">
+                            {totalBilled.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
+                          </td>
+                          <td className="p-4 text-right font-mono text-amber-600 font-black">
+                            {totalCommission.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
+                          </td>
+                          <td className="p-4 text-center">
+                            {isPaid && payment ? (
+                              <div className="inline-flex flex-col items-center">
+                                <span className="px-3 py-1 bg-green-100 text-green-800 border border-green-200/50 rounded-full text-xs font-bold flex items-center gap-1">
+                                  <CheckCircle2 className="w-3.5 h-3.5" />
+                                  <span>PAGADO</span>
+                                </span>
+                                <span className="text-[10px] text-slate-400 font-semibold mt-1">
+                                  {new Date(payment.datePaid).toLocaleDateString('es-ES')}
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="px-3 py-1 bg-amber-100 text-amber-800 border border-amber-200/50 rounded-full text-xs font-bold flex items-center gap-1 inline-flex">
+                                <AlertTriangle className="w-3.5 h-3.5" />
+                                <span>PENDIENTE</span>
+                              </span>
+                            )}
+                          </td>
+                          <td className="p-4 pr-6 text-center">
+                            {isPaid && payment ? (
+                              <button
+                                onClick={() => {
+                                  if (window.confirm(`¿Seguro que quieres anular este pago de ${payment.amountPaid} € a ${payment.workerName}?`)) {
+                                    onDeletePayrollPayment(payment.id);
+                                  }
+                                }}
+                                className="px-3 py-1.5 hover:bg-red-50 text-red-500 hover:text-red-700 rounded-lg border border-transparent hover:border-red-200/30 font-bold text-xs transition-all flex items-center justify-center gap-1 mx-auto cursor-pointer"
+                                title="Anular este registro de pago"
+                                id={`btn-delete-payment-${worker.id}`}
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                                <span>Anular Pago</span>
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => {
+                                  setPaymentFormWorker(worker);
+                                  setCustomPayAmount(parseFloat(totalCommission.toFixed(2)));
+                                  setPayNote(`Pago correspondiente a la ${payrollPeriod === 'first-half' ? '1ª quincena (1-15)' : '2ª quincena (16-fin)'} de ${['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'][selectedMonth]} de {selectedYear}`);
+                                }}
+                                className="px-4 py-2 bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white rounded-lg font-bold text-xs shadow-md shadow-amber-500/10 transition-all flex items-center justify-center gap-1.5 mx-auto cursor-pointer"
+                                id={`btn-register-payment-${worker.id}`}
+                              >
+                                <DollarSign className="w-3.5 h-3.5" />
+                                <span>Registrar Pago</span>
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* Historial de Pagos de la Quincena Actual */}
+            <div className="bg-white p-8 rounded-2xl border border-slate-100 shadow-sm">
+              <h3 className="font-display font-bold text-slate-800 text-base mb-2 flex items-center gap-2">
+                <Receipt className="w-5 h-5 text-amber-500" />
+                <span>Historial de Pagos Registrados en esta Quincena</span>
+              </h3>
+              <p className="text-slate-400 text-xs mb-6">
+                Registro oficial de pagos efectuados a estilistas para el periodo actual.
+              </p>
+
+              {registeredPeriodPayments.length === 0 ? (
+                <div className="text-center py-10 text-slate-400 text-xs font-medium bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
+                  <AlertCircle className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                  <span>No se han registrado pagos para esta quincena todavía.</span>
+                </div>
+              ) : (
+                <div className="overflow-x-auto rounded-xl border border-slate-100">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="bg-slate-50 text-slate-500 uppercase text-[10px] tracking-wider font-bold border-b border-slate-100">
+                        <th className="p-3">Fecha Pago</th>
+                        <th className="p-3">Estilista</th>
+                        <th className="p-3 text-right">Importe Pagado</th>
+                        <th className="p-3">Detalle/Nota de Transferencia</th>
+                        <th className="p-3 text-center">Acción</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 font-medium">
+                      {registeredPeriodPayments.map((pay) => (
+                        <tr key={pay.id} className="hover:bg-slate-50/50 transition-colors">
+                          <td className="p-3 font-mono text-slate-500 whitespace-nowrap">
+                            {new Date(pay.datePaid).toLocaleDateString('es-ES')}
+                          </td>
+                          <td className="p-3 font-bold text-slate-800 whitespace-nowrap flex items-center gap-2">
+                            <div className="w-6 h-6 rounded-full bg-amber-100 text-amber-800 font-display font-black text-[10px] flex items-center justify-center">
+                              {pay.workerName.charAt(0)}
+                            </div>
+                            <span>{pay.workerName}</span>
+                          </td>
+                          <td className="p-3 text-right font-mono font-bold text-slate-700 whitespace-nowrap text-amber-600">
+                            {pay.amountPaid.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
+                          </td>
+                          <td className="p-3 text-slate-500 italic max-w-xs md:max-w-md break-words font-medium">
+                            {pay.note || "Sin notas de transferencia."}
+                          </td>
+                          <td className="p-3 text-center">
+                            <button
+                              onClick={() => {
+                                if (window.confirm(`¿Seguro que deseas anular este pago de ${pay.amountPaid} € a ${pay.workerName}?`)) {
+                                  onDeletePayrollPayment(pay.id);
+                                }
+                              }}
+                              className="p-1 hover:bg-red-50 text-red-500 hover:text-red-700 rounded transition-all cursor-pointer inline-flex"
+                              title="Anular pago"
+                              id={`btn-history-delete-${pay.id}`}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* MODAL / POPUP DE REGISTRO DE PAGO */}
+            <AnimatePresence>
+              {paymentFormWorker && (
+                <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    transition={{ duration: 0.15 }}
+                    className="bg-white rounded-2xl shadow-xl border border-slate-100 w-full max-w-md overflow-hidden"
+                    id="payroll-payment-modal"
+                  >
+                    <div className="bg-amber-500 px-6 py-5 text-white flex justify-between items-center">
+                      <div>
+                        <h4 className="font-display font-bold text-lg leading-tight flex items-center gap-1.5">
+                          <Coins className="w-5 h-5 text-white" />
+                          <span>Registrar Pago de Nómina</span>
+                        </h4>
+                        <p className="text-white/80 text-xs mt-1">
+                          Estilista: <strong className="font-semibold text-white">{paymentFormWorker.name}</strong>
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => setPaymentFormWorker(null)}
+                        className="text-white/80 hover:text-white hover:bg-white/10 p-1.5 rounded-lg transition-all cursor-pointer"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
+                    </div>
+
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        onRegisterPayrollPayment({
+                          workerId: paymentFormWorker.id,
+                          workerName: paymentFormWorker.name,
+                          year: selectedYear,
+                          month: selectedMonth,
+                          period: payrollPeriod,
+                          amountPaid: customPayAmount,
+                          datePaid: payDate,
+                          status: 'paid',
+                          note: payNote
+                        });
+                        setPaymentFormWorker(null);
+                        setPayNote('');
+                      }}
+                      className="p-6 space-y-4"
+                    >
+                      {/* Campo Importe */}
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                          Importe a Transferir/Pagar (€)
+                        </label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold font-mono text-sm">€</span>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={customPayAmount}
+                            onChange={(e) => setCustomPayAmount(parseFloat(e.target.value) || 0)}
+                            className="w-full pl-8 pr-4 py-2.5 bg-slate-50 hover:bg-slate-100/50 focus:bg-white border border-slate-200/80 focus:border-amber-500 rounded-xl font-mono text-slate-800 font-bold focus:ring-4 focus:ring-amber-500/10 transition-all outline-none"
+                            required
+                            id="field-payroll-amount"
+                          />
+                        </div>
+                        <p className="text-[10px] text-slate-400 mt-1">
+                          Comisión sugerida basada en los servicios realizados: <strong>{customPayAmount} €</strong>.
+                        </p>
+                      </div>
+
+                      {/* Campo Fecha */}
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                          Fecha del Pago
+                        </label>
+                        <input
+                          type="date"
+                          value={payDate}
+                          onChange={(e) => setPayDate(e.target.value)}
+                          className="w-full px-4 py-2.5 bg-slate-50 hover:bg-slate-100/50 focus:bg-white border border-slate-200/80 focus:border-amber-500 rounded-xl text-slate-800 font-semibold focus:ring-4 focus:ring-amber-500/10 transition-all outline-none"
+                          required
+                          id="field-payroll-date"
+                        />
+                      </div>
+
+                      {/* Campo Notas/Referencia */}
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                          Referencia / Comentarios
+                        </label>
+                        <textarea
+                          rows={3}
+                          value={payNote}
+                          onChange={(e) => setPayNote(e.target.value)}
+                          placeholder="Ej: Transferencia bancaria o efectivo..."
+                          className="w-full px-4 py-2.5 bg-slate-50 hover:bg-slate-100/50 focus:bg-white border border-slate-200/80 focus:border-amber-500 rounded-xl text-slate-800 font-medium placeholder-slate-400 focus:ring-4 focus:ring-amber-500/10 transition-all outline-none resize-none text-xs"
+                          id="field-payroll-note"
+                        />
+                      </div>
+
+                      <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 text-xs text-slate-500 flex gap-2 items-start leading-relaxed">
+                        <AlertCircle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                        <span>Este pago se guardará con la marca quincenal seleccionada ({payrollPeriod === 'first-half' ? '1ª quincena' : '2ª quincena'} de {['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'][selectedMonth]} {selectedYear}).</span>
+                      </div>
+
+                      {/* Botones de Acción */}
+                      <div className="flex gap-3 pt-2">
+                        <button
+                          type="button"
+                          onClick={() => setPaymentFormWorker(null)}
+                          className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 font-bold rounded-xl transition-all cursor-pointer text-xs"
+                        >
+                          Cancelar
+                        </button>
+                        <button
+                          type="submit"
+                          className="flex-1 py-2.5 bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white font-bold rounded-xl shadow-md shadow-amber-500/10 transition-all cursor-pointer text-xs"
+                          id="btn-confirm-payroll-payment"
+                        >
+                          Confirmar Pago
+                        </button>
+                      </div>
+                    </form>
+                  </motion.div>
+                </div>
+              )}
+            </AnimatePresence>
           </motion.div>
         )}
       </div>

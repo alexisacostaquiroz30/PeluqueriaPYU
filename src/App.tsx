@@ -6,7 +6,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   User, Category, Service, ServiceTicket, 
-  FixedExpense, VariableExpense, AppSettings, AuditLog
+  FixedExpense, VariableExpense, AppSettings, AuditLog, PayrollPayment
 } from './types';
 import { 
   INITIAL_USERS, INITIAL_CATEGORIES, INITIAL_SERVICES, 
@@ -44,6 +44,7 @@ export default function App() {
   const [variableExpenses, setVariableExpenses] = useState<VariableExpense[]>(INITIAL_VARIABLE_EXPENSES);
   const [settings, setSettings] = useState<AppSettings>(INITIAL_SETTINGS);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+  const [payrollPayments, setPayrollPayments] = useState<PayrollPayment[]>([]);
 
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
     const saved = localStorage.getItem('salon_logged_user');
@@ -73,6 +74,38 @@ export default function App() {
           snapshot.forEach((docSnap) => {
             list.push(docSnap.data() as User);
           });
+
+          // Automigración para asegurar que queden únicamente los trabajadores solicitados:
+          // Daniela Nieto, Daniela Cuero, Rafael y Naidy.
+          // Se elimina "Daniela jefe", "Anaís" o cualquier otro usuario no autorizado del sistema.
+          const allowedIds = ['u-admin', 'u-danielan', 'u-danielac', 'u-rafael', 'u-naidy'];
+          const hasUnwantedUsers = list.some(u => !allowedIds.includes(u.id) || u.name.toLowerCase().includes('jefe'));
+          const isDanielaCueto = list.some(u => u.id === 'u-danielac' && u.name === 'Daniela Cueto');
+          const isNaidyMissing = !list.some(u => u.id === 'u-naidy');
+          const isAdminUpdated = list.some(u => u.id === 'u-admin' && u.email?.toLowerCase() === 'jaaq7919@gmail.com');
+
+          if (hasUnwantedUsers || isDanielaCueto || isNaidyMissing || !isAdminUpdated) {
+            try {
+              // Eliminar cualquier usuario no permitido o que contenga "jefe"
+              for (const u of list) {
+                if (!allowedIds.includes(u.id) || u.name.toLowerCase().includes('jefe')) {
+                  await deleteDoc(doc(db, 'users', u.id));
+                }
+              }
+              // Asegurar que se escriban los usuarios actuales (Daniela Cuero, Naidy, etc. más u-admin actualizado)
+              for (const u of INITIAL_USERS) {
+                await setDoc(doc(db, 'users', u.id), u);
+              }
+              // Sincronizar tickets iniciales con los nuevos IDs
+              for (const tk of INITIAL_TICKETS) {
+                await setDoc(doc(db, 'tickets', tk.id), tk);
+              }
+              return;
+            } catch (err) {
+              console.error('Error en migración de estilistas:', err);
+            }
+          }
+
           setUsers(list);
         }
       },
@@ -243,6 +276,21 @@ export default function App() {
       }
     );
 
+    // 9. Pagos de Nómina (payrollPayments)
+    const unsubscribePayrollPayments = onSnapshot(
+      collection(db, 'payrollPayments'),
+      (snapshot) => {
+        const list: PayrollPayment[] = [];
+        snapshot.forEach((docSnap) => {
+          list.push(docSnap.data() as PayrollPayment);
+        });
+        setPayrollPayments(list);
+      },
+      (error) => {
+        console.error('Error al escuchar pagos de nómina:', error);
+      }
+    );
+
     return () => {
       unsubscribeUsers();
       unsubscribeCategories();
@@ -252,6 +300,7 @@ export default function App() {
       unsubscribeVariableExpenses();
       unsubscribeSettings();
       unsubscribeAuditLogs();
+      unsubscribePayrollPayments();
     };
   }, []);
 
@@ -260,11 +309,15 @@ export default function App() {
     const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
       if (firebaseUser) {
         const email = firebaseUser.email;
+        const isAdminEmail = email && email.toLowerCase() === 'jaaq7919@gmail.com';
         const matched = users.find(
           (u) => u.id === firebaseUser.uid || (email && u.email?.toLowerCase() === email.toLowerCase())
         );
         if (matched) {
-          setCurrentUser(matched);
+          setCurrentUser({
+            ...matched,
+            role: isAdminEmail ? 'admin' : matched.role,
+          });
         } else if (email) {
           const username = email.split('@')[0];
           setCurrentUser({
@@ -272,7 +325,7 @@ export default function App() {
             username,
             name: firebaseUser.displayName || username,
             email: email,
-            role: 'worker', // Rol por defecto
+            role: isAdminEmail ? 'admin' : 'worker',
           });
         }
       } else {
@@ -611,6 +664,50 @@ export default function App() {
     }
   };
 
+  // REGISTRO DE PAGOS DE NÓMINA (BI-MENSUAL/QUINCENAL)
+  const handleRegisterPayrollPayment = async (payment: Omit<PayrollPayment, 'id'>) => {
+    const id = `pay-${Date.now()}`;
+    const newPayment: PayrollPayment = {
+      id,
+      ...payment
+    };
+    try {
+      await setDoc(doc(db, 'payrollPayments', id), cleanData(newPayment));
+      
+      const monthNames = [
+        'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+        'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+      ];
+      const periodLabel = payment.period === 'first-half' ? '1ª quincena (1-15)' : '2ª quincena (16-fin de mes)';
+      await addAuditLog(
+        'register_payroll_payment',
+        `Registró un pago de nómina de ${payment.amountPaid} € a ${payment.workerName} (${periodLabel} de ${monthNames[payment.month]} de ${payment.year})`
+      );
+    } catch (e) {
+      handleFirestoreError(e, OperationType.WRITE, `payrollPayments/${id}`);
+    }
+  };
+
+  const handleDeletePayrollPayment = async (id: string) => {
+    try {
+      const payObj = payrollPayments.find(p => p.id === id);
+      await deleteDoc(doc(db, 'payrollPayments', id));
+      if (payObj) {
+        const monthNames = [
+          'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+          'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+        ];
+        const periodLabel = payObj.period === 'first-half' ? '1ª quincena (1-15)' : '2ª quincena (16-fin de mes)';
+        await addAuditLog(
+          'delete_payroll_payment',
+          `Eliminó el registro de pago de nómina de ${payObj.amountPaid} € a ${payObj.workerName} (${periodLabel} de ${monthNames[payObj.month]} de ${payObj.year})`
+        );
+      }
+    } catch (e) {
+      handleFirestoreError(e, OperationType.DELETE, `payrollPayments/${id}`);
+    }
+  };
+
   // RESET DATABASE TRIGGER (Para el Administrador o facilidad de testing)
   const handleResetToDefaults = async () => {
     if (window.confirm('¿Seguro que quieres restaurar la base de datos a los valores de fábrica? Perderás tus registros nuevos.')) {
@@ -684,6 +781,10 @@ export default function App() {
             auditLogs={auditLogs}
             selectedMonth={selectedMonth}
             selectedYear={selectedYear}
+            payrollPayments={payrollPayments}
+            onRegisterPayrollPayment={handleRegisterPayrollPayment}
+            onDeletePayrollPayment={handleDeletePayrollPayment}
+            onAddTicket={handleAddTicket}
             onDeleteTicket={handleDeleteTicket}
             onRejectDeleteTicket={handleRejectDeleteTicket}
             onAddCategory={handleAddCategory}
@@ -715,6 +816,7 @@ export default function App() {
             settings={settings}
             selectedMonth={selectedMonth}
             selectedYear={selectedYear}
+            payrollPayments={payrollPayments}
             onAddTicket={handleAddTicket}
             onRequestDeleteTicket={handleRequestDeleteTicket}
             onCancelRequestDeleteTicket={handleCancelRequestDeleteTicket}

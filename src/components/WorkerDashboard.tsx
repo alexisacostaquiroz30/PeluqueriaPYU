@@ -4,11 +4,11 @@
  */
 
 import React, { useState } from 'react';
-import { User, Category, Service, ServiceTicket, AppSettings } from '../types';
+import { User, Category, Service, ServiceTicket, AppSettings, PayrollPayment } from '../types';
 import { 
   LogOut, Plus, Calendar, Scissors, Sparkles, DollarSign, 
   TrendingUp, Layers, CheckCircle2, Trash2, Tag, FileText, ClipboardList,
-  AlertTriangle, Clock, X, RotateCcw, ChevronLeft, ChevronRight
+  AlertTriangle, Clock, X, RotateCcw, ChevronLeft, ChevronRight, Coins
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -20,6 +20,7 @@ interface WorkerDashboardProps {
   settings: AppSettings;
   selectedMonth: number; // 0-indexed (0 = Enero, 11 = Diciembre)
   selectedYear: number;
+  payrollPayments: PayrollPayment[];
   onAddTicket: (ticket: Omit<ServiceTicket, 'id'>) => void;
   onRequestDeleteTicket: (ticketId: string, reason: string) => void;
   onCancelRequestDeleteTicket: (ticketId: string) => void;
@@ -36,6 +37,7 @@ export default function WorkerDashboard({
   settings,
   selectedMonth,
   selectedYear,
+  payrollPayments,
   onAddTicket,
   onRequestDeleteTicket,
   onCancelRequestDeleteTicket,
@@ -159,6 +161,35 @@ export default function WorkerDashboard({
   const totalCommissionEarned = workerTickets.reduce((sum, t) => sum + (t.price * (t.commissionRate / 100)), 0);
   const totalServicesCount = workerTickets.length;
 
+  // --- LIQUIDACIONES DE PAGO QUINCENAL (DÍAS 15 Y FIN DE MES) ---
+  const firstHalfTickets = workerTickets.filter(t => {
+    const parts = t.date.split('-');
+    if (parts.length !== 3) return false;
+    const tDay = parseInt(parts[2], 10);
+    return tDay >= 1 && tDay <= 15;
+  });
+  const firstHalfCommission = firstHalfTickets.reduce((sum, t) => sum + (t.price * (t.commissionRate / 100)), 0);
+  const firstHalfPaymentObj = payrollPayments.find(
+    p => p.workerId === worker.id &&
+         p.year === selectedYear &&
+         p.month === selectedMonth &&
+         p.period === 'first-half'
+  );
+
+  const secondHalfTickets = workerTickets.filter(t => {
+    const parts = t.date.split('-');
+    if (parts.length !== 3) return false;
+    const tDay = parseInt(parts[2], 10);
+    return tDay >= 16;
+  });
+  const secondHalfCommission = secondHalfTickets.reduce((sum, t) => sum + (t.price * (t.commissionRate / 100)), 0);
+  const secondHalfPaymentObj = payrollPayments.find(
+    p => p.workerId === worker.id &&
+         p.year === selectedYear &&
+         p.month === selectedMonth &&
+         p.period === 'second-half'
+  );
+
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
       {/* Header superior */}
@@ -270,6 +301,123 @@ export default function WorkerDashboard({
             <Scissors className="w-5 h-5" />
           </div>
         </motion.div>
+      </div>
+
+      {/* Estado y Liquidación de Pagos Quincenales */}
+      <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm mb-8" id="worker-payroll-tracking">
+        <div className="flex items-center gap-2 pb-4 mb-6 border-b border-slate-100">
+          <Coins className="w-5 h-5 text-amber-500" />
+          <div>
+            <h2 className="font-display text-base font-bold text-slate-800">
+              Mi Estado de Liquidación y Pagos Quincenales
+            </h2>
+            <p className="text-slate-400 text-xs mt-0.5">
+              Control transparente de tus comisiones y cobros del mes de <strong className="text-amber-500 font-semibold">{MONTHS[selectedMonth]} {selectedYear}</strong>.
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Tarjeta Primera Quincena */}
+          <div className="bg-slate-50/50 p-5 rounded-xl border border-slate-100 flex flex-col justify-between">
+            <div>
+              <div className="flex justify-between items-start mb-4">
+                <div>
+                  <span className="text-[10px] uppercase font-extrabold tracking-wider text-slate-400">Primer Período</span>
+                  <h4 className="font-display font-bold text-slate-700 text-sm mt-0.5">1ª Quincena (Días 1 al 15)</h4>
+                </div>
+                {firstHalfPaymentObj ? (
+                  <span className="px-2.5 py-0.5 bg-green-100 text-green-800 border border-green-200/50 rounded-full text-[10px] font-bold flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3" />
+                    <span>PAGADO</span>
+                  </span>
+                ) : (
+                  <span className="px-2.5 py-0.5 bg-amber-100 text-amber-800 border border-amber-200/50 rounded-full text-[10px] font-bold flex items-center gap-1">
+                    <Clock className="w-3 h-3" />
+                    <span>PENDIENTE</span>
+                  </span>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 py-3 bg-white px-4 rounded-lg border border-slate-100 shadow-xs mb-4">
+                <div>
+                  <span className="text-[10px] text-slate-400 font-semibold block">Servicios</span>
+                  <span className="font-display font-extrabold text-slate-800 text-sm">{firstHalfTickets.length} realizados</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-400 font-semibold block">Tu Comisión</span>
+                  <span className="font-mono font-bold text-amber-600 text-sm">{firstHalfCommission.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="text-[11px] text-slate-500 pt-2 border-t border-slate-100/50">
+              {firstHalfPaymentObj ? (
+                <div className="bg-green-50/50 p-2.5 rounded-lg border border-green-100/30 text-green-800">
+                  <p className="font-bold">✓ Recibido el {new Date(firstHalfPaymentObj.datePaid).toLocaleDateString('es-ES')}</p>
+                  {firstHalfPaymentObj.note && (
+                    <p className="text-[10px] text-slate-500 mt-1 italic">"{firstHalfPaymentObj.note}"</p>
+                  )}
+                </div>
+              ) : (
+                <p className="text-slate-400 flex items-center gap-1">
+                  <AlertTriangle className="w-3 h-3 text-amber-500 shrink-0" />
+                  <span>Tu pago se procesará y aparecerá aquí una vez registrado por el administrador.</span>
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Tarjeta Segunda Quincena */}
+          <div className="bg-slate-50/50 p-5 rounded-xl border border-slate-100 flex flex-col justify-between">
+            <div>
+              <div className="flex justify-between items-start mb-4">
+                <div>
+                  <span className="text-[10px] uppercase font-extrabold tracking-wider text-slate-400">Segundo Período</span>
+                  <h4 className="font-display font-bold text-slate-700 text-sm mt-0.5">2ª Quincena (Días 16 al Fin)</h4>
+                </div>
+                {secondHalfPaymentObj ? (
+                  <span className="px-2.5 py-0.5 bg-green-100 text-green-800 border border-green-200/50 rounded-full text-[10px] font-bold flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3" />
+                    <span>PAGADO</span>
+                  </span>
+                ) : (
+                  <span className="px-2.5 py-0.5 bg-amber-100 text-amber-800 border border-amber-200/50 rounded-full text-[10px] font-bold flex items-center gap-1">
+                    <Clock className="w-3 h-3" />
+                    <span>PENDIENTE</span>
+                  </span>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 py-3 bg-white px-4 rounded-lg border border-slate-100 shadow-xs mb-4">
+                <div>
+                  <span className="text-[10px] text-slate-400 font-semibold block">Servicios</span>
+                  <span className="font-display font-extrabold text-slate-800 text-sm">{secondHalfTickets.length} realizados</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-400 font-semibold block">Tu Comisión</span>
+                  <span className="font-mono font-bold text-amber-600 text-sm">{secondHalfCommission.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="text-[11px] text-slate-500 pt-2 border-t border-slate-100/50">
+              {secondHalfPaymentObj ? (
+                <div className="bg-green-50/50 p-2.5 rounded-lg border border-green-100/30 text-green-800">
+                  <p className="font-bold">✓ Recibido el {new Date(secondHalfPaymentObj.datePaid).toLocaleDateString('es-ES')}</p>
+                  {secondHalfPaymentObj.note && (
+                    <p className="text-[10px] text-slate-500 mt-1 italic">"{secondHalfPaymentObj.note}"</p>
+                  )}
+                </div>
+              ) : (
+                <p className="text-slate-400 flex items-center gap-1">
+                  <AlertTriangle className="w-3 h-3 text-amber-500 shrink-0" />
+                  <span>Tu pago se procesará y aparecerá aquí una vez registrado por el administrador.</span>
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Grid de contenido */}

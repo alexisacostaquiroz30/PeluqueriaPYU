@@ -304,7 +304,7 @@ export default function Login({ users, onLogin }: LoginProps) {
                       required
                       id="login-identifier-input"
                       className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all text-sm"
-                      placeholder="ej. sofia@salonprofit.com o sofia"
+                      placeholder="ej. daniela_n@salonprofit.com o daniela_n"
                       value={loginIdentifier}
                       onChange={(e) => setLoginIdentifier(e.target.value)}
                       disabled={loading}

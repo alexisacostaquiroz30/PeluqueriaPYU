@@ -66,3 +66,17 @@ export interface AuditLog {
   details: string;
   timestamp: string; // formato ISO 8601
 }
+
+export interface PayrollPayment {
+  id: string;
+  workerId: string;
+  workerName: string;
+  year: number;
+  month: number; // 0 a 11
+  period: 'first-half' | 'second-half'; // 'first-half' (1-15), 'second-half' (16-fin de mes)
+  amountPaid: number;
+  datePaid: string; // YYYY-MM-DD
+  status: 'paid';
+  note?: string;
+}
+
