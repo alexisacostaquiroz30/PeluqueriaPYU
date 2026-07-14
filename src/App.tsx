@@ -74,38 +74,6 @@ export default function App() {
           snapshot.forEach((docSnap) => {
             list.push(docSnap.data() as User);
           });
-
-          // Automigración para asegurar que queden únicamente los trabajadores solicitados:
-          // Daniela Nieto, Daniela Cuero, Rafael y Naidy.
-          // Se elimina "Daniela jefe", "Anaís" o cualquier otro usuario no autorizado del sistema.
-          const allowedIds = ['u-admin', 'u-danielan', 'u-danielac', 'u-rafael', 'u-naidy'];
-          const hasUnwantedUsers = list.some(u => !allowedIds.includes(u.id) || u.name.toLowerCase().includes('jefe'));
-          const isDanielaCueto = list.some(u => u.id === 'u-danielac' && u.name === 'Daniela Cueto');
-          const isNaidyMissing = !list.some(u => u.id === 'u-naidy');
-          const isAdminUpdated = list.some(u => u.id === 'u-admin' && u.email?.toLowerCase() === 'jaaq7919@gmail.com');
-
-          if (hasUnwantedUsers || isDanielaCueto || isNaidyMissing || !isAdminUpdated) {
-            try {
-              // Eliminar cualquier usuario no permitido o que contenga "jefe"
-              for (const u of list) {
-                if (!allowedIds.includes(u.id) || u.name.toLowerCase().includes('jefe')) {
-                  await deleteDoc(doc(db, 'users', u.id));
-                }
-              }
-              // Asegurar que se escriban los usuarios actuales (Daniela Cuero, Naidy, etc. más u-admin actualizado)
-              for (const u of INITIAL_USERS) {
-                await setDoc(doc(db, 'users', u.id), u);
-              }
-              // Sincronizar tickets iniciales con los nuevos IDs
-              for (const tk of INITIAL_TICKETS) {
-                await setDoc(doc(db, 'tickets', tk.id), tk);
-              }
-              return;
-            } catch (err) {
-              console.error('Error en migración de estilistas:', err);
-            }
-          }
-
           setUsers(list);
         }
       },
@@ -167,23 +135,13 @@ export default function App() {
     // 4. Tickets (tickets)
     const unsubscribeTickets = onSnapshot(
       collection(db, 'tickets'),
-      async (snapshot) => {
-        if (snapshot.empty) {
-          try {
-            for (const tk of INITIAL_TICKETS) {
-              await setDoc(doc(db, 'tickets', tk.id), tk);
-            }
-          } catch (e) {
-            handleFirestoreError(e, OperationType.WRITE, 'tickets');
-          }
-        } else {
-          const list: ServiceTicket[] = [];
-          snapshot.forEach((docSnap) => {
-            list.push(docSnap.data() as ServiceTicket);
-          });
-          list.sort((a, b) => b.id.localeCompare(a.id));
-          setTickets(list);
-        }
+      (snapshot) => {
+        const list: ServiceTicket[] = [];
+        snapshot.forEach((docSnap) => {
+          list.push(docSnap.data() as ServiceTicket);
+        });
+        list.sort((a, b) => b.id.localeCompare(a.id));
+        setTickets(list);
       },
       (error) => {
         handleFirestoreError(error, OperationType.GET, 'tickets');
@@ -193,22 +151,12 @@ export default function App() {
     // 5. Gastos Fijos (fixedExpenses)
     const unsubscribeFixedExpenses = onSnapshot(
       collection(db, 'fixedExpenses'),
-      async (snapshot) => {
-        if (snapshot.empty) {
-          try {
-            for (const exp of INITIAL_FIXED_EXPENSES) {
-              await setDoc(doc(db, 'fixedExpenses', exp.id), exp);
-            }
-          } catch (e) {
-            handleFirestoreError(e, OperationType.WRITE, 'fixedExpenses');
-          }
-        } else {
-          const list: FixedExpense[] = [];
-          snapshot.forEach((docSnap) => {
-            list.push(docSnap.data() as FixedExpense);
-          });
-          setFixedExpenses(list);
-        }
+      (snapshot) => {
+        const list: FixedExpense[] = [];
+        snapshot.forEach((docSnap) => {
+          list.push(docSnap.data() as FixedExpense);
+        });
+        setFixedExpenses(list);
       },
       (error) => {
         handleFirestoreError(error, OperationType.GET, 'fixedExpenses');
@@ -218,23 +166,13 @@ export default function App() {
     // 6. Gastos Variables (variableExpenses)
     const unsubscribeVariableExpenses = onSnapshot(
       collection(db, 'variableExpenses'),
-      async (snapshot) => {
-        if (snapshot.empty) {
-          try {
-            for (const exp of INITIAL_VARIABLE_EXPENSES) {
-              await setDoc(doc(db, 'variableExpenses', exp.id), exp);
-            }
-          } catch (e) {
-            handleFirestoreError(e, OperationType.WRITE, 'variableExpenses');
-          }
-        } else {
-          const list: VariableExpense[] = [];
-          snapshot.forEach((docSnap) => {
-            list.push(docSnap.data() as VariableExpense);
-          });
-          list.sort((a, b) => b.id.localeCompare(a.id));
-          setVariableExpenses(list);
-        }
+      (snapshot) => {
+        const list: VariableExpense[] = [];
+        snapshot.forEach((docSnap) => {
+          list.push(docSnap.data() as VariableExpense);
+        });
+        list.sort((a, b) => b.id.localeCompare(a.id));
+        setVariableExpenses(list);
       },
       (error) => {
         handleFirestoreError(error, OperationType.GET, 'variableExpenses');
@@ -741,9 +679,9 @@ export default function App() {
         for (const srv of INITIAL_SERVICES) {
           await setDoc(doc(db, 'services', srv.id), srv);
         }
-        for (const tk of INITIAL_TICKETS) {
-          await setDoc(doc(db, 'tickets', tk.id), tk);
-        }
+        //for (const tk of INITIAL_TICKETS) {
+          //await setDoc(doc(db, 'tickets', tk.id), tk);
+        //}
         for (const exp of INITIAL_FIXED_EXPENSES) {
           await setDoc(doc(db, 'fixedExpenses', exp.id), exp);
         }

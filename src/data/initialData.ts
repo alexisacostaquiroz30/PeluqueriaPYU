@@ -72,56 +72,27 @@ export const INITIAL_SETTINGS: AppSettings = {
 export const INITIAL_TICKETS: ServiceTicket[] = [
   // --- JUNIO 2026 ---
   // Daniela Nieto
-  { id: 'tk-1', workerId: 'u-danielan', categoryId: 'cat-1', serviceId: 'srv-2', serviceName: 'Corte de Dama + Secado', price: 32, commissionRate: 50, date: '2026-06-02' },
-  { id: 'tk-2', workerId: 'u-danielan', categoryId: 'cat-2', serviceId: 'srv-6', serviceName: 'Mechas Balayage Completas', price: 95, commissionRate: 50, date: '2026-06-04' },
-  { id: 'tk-3', workerId: 'u-danielan', categoryId: 'cat-1', serviceId: 'srv-4', serviceName: 'Peinado de Gala / Ondas', price: 40, commissionRate: 50, date: '2026-06-10' },
-  { id: 'tk-4', workerId: 'u-danielan', categoryId: 'cat-2', serviceId: 'srv-5', serviceName: 'Tinte de Raíz', price: 35, commissionRate: 50, date: '2026-06-15' },
-  { id: 'tk-5', workerId: 'u-danielan', categoryId: 'cat-3', serviceId: 'srv-8', serviceName: 'Tratamiento de Queratina Profesional', price: 120, commissionRate: 50, date: '2026-06-20' },
+  //{ id: 'tk-1', workerId: 'u-danielan', categoryId: 'cat-1', serviceId: 'srv-2', serviceName: 'Corte de Dama + Secado', price: 32, commissionRate: 50, date: '2026-06-02' },
   
   // Daniela Cuero
-  { id: 'tk-6', workerId: 'u-danielac', categoryId: 'cat-1', serviceId: 'srv-1', serviceName: 'Corte de Caballero + Lavado', price: 18, commissionRate: 50, date: '2026-06-02' },
-  { id: 'tk-7', workerId: 'u-danielac', categoryId: 'cat-1', serviceId: 'srv-3', serviceName: 'Arreglo de Barba con Navaja', price: 12, commissionRate: 50, date: '2026-06-02' },
-  { id: 'tk-8', workerId: 'u-danielac', categoryId: 'cat-1', serviceId: 'srv-1', serviceName: 'Corte de Caballero + Lavado', price: 18, commissionRate: 50, date: '2026-06-03' },
-  { id: 'tk-9', workerId: 'u-danielac', categoryId: 'cat-1', serviceId: 'srv-1', serviceName: 'Corte de Caballero + Lavado', price: 18, commissionRate: 50, date: '2026-06-06' },
-  { id: 'tk-10', workerId: 'u-danielac', categoryId: 'cat-1', serviceId: 'srv-2', serviceName: 'Corte de Dama + Secado', price: 32, commissionRate: 50, date: '2026-06-12' },
-  { id: 'tk-11', workerId: 'u-danielac', categoryId: 'cat-2', serviceId: 'srv-6', serviceName: 'Mechas Balayage Completas', price: 95, commissionRate: 50, date: '2026-06-18' },
-  { id: 'tk-12', workerId: 'u-danielac', categoryId: 'cat-1', serviceId: 'srv-1', serviceName: 'Corte de Caballero + Lavado', price: 18, commissionRate: 50, date: '2026-06-25' },
+  //{ id: 'tk-6', workerId: 'u-danielac', categoryId: 'cat-1', serviceId: 'srv-1', serviceName: 'Corte de Caballero + Lavado', price: 18, commissionRate: 50, date: '2026-06-02' },
   
   // Rafael
-  { id: 'tk-13', workerId: 'u-rafael', categoryId: 'cat-4', serviceId: 'srv-10', serviceName: 'Manicura Semipermanente', price: 25, commissionRate: 50, date: '2026-06-03' },
-  { id: 'tk-14', workerId: 'u-rafael', categoryId: 'cat-4', serviceId: 'srv-12', serviceName: 'Uñas de Gel Nuevas', price: 55, commissionRate: 50, date: '2026-06-04' },
-  { id: 'tk-15', workerId: 'u-rafael', categoryId: 'cat-4', serviceId: 'srv-11', serviceName: 'Pedicura Completa Estética', price: 35, commissionRate: 50, date: '2026-06-08' },
-  { id: 'tk-16', workerId: 'u-rafael', categoryId: 'cat-4', serviceId: 'srv-10', serviceName: 'Manicura Semipermanente', price: 25, commissionRate: 50, date: '2026-06-15' },
-  { id: 'tk-17', workerId: 'u-rafael', categoryId: 'cat-4', serviceId: 'srv-12', serviceName: 'Uñas de Gel Nuevas', price: 55, commissionRate: 50, date: '2026-06-22' },
+  //{ id: 'tk-13', workerId: 'u-rafael', categoryId: 'cat-4', serviceId: 'srv-10', serviceName: 'Manicura Semipermanente', price: 25, commissionRate: 50, date: '2026-06-03' },
   
   // Naidy
-  { id: 'tk-18', workerId: 'u-naidy', categoryId: 'cat-3', serviceId: 'srv-9', serviceName: 'Hidratación con Ácido Hialurónico', price: 45, commissionRate: 50, date: '2026-06-05' },
-  { id: 'tk-19', workerId: 'u-naidy', categoryId: 'cat-2', serviceId: 'srv-5', serviceName: 'Tinte de Raíz', price: 35, commissionRate: 50, date: '2026-06-09' },
-  { id: 'tk-20', workerId: 'u-naidy', categoryId: 'cat-1', serviceId: 'srv-2', serviceName: 'Corte de Dama + Secado', price: 32, commissionRate: 50, date: '2026-06-14' },
-  { id: 'tk-21', workerId: 'u-naidy', categoryId: 'cat-3', serviceId: 'srv-8', serviceName: 'Tratamiento de Queratina Profesional', price: 120, commissionRate: 50, date: '2026-06-19' },
- 
+  //{ id: 'tk-18', workerId: 'u-naidy', categoryId: 'cat-3', serviceId: 'srv-9', serviceName: 'Hidratación con Ácido Hialurónico', price: 45, commissionRate: 50, date: '2026-06-05' },
+  
   // --- JULIO 2026 (Mes corriente) ---
   // Daniela Nieto
-  { id: 'tk-22', workerId: 'u-danielan', categoryId: 'cat-1', serviceId: 'srv-2', serviceName: 'Corte de Dama + Secado', price: 32, commissionRate: 50, date: '2026-07-01' },
-  { id: 'tk-23', workerId: 'u-danielan', categoryId: 'cat-2', serviceId: 'srv-6', serviceName: 'Mechas Balayage Completas', price: 95, commissionRate: 50, date: '2026-07-02' },
-  { id: 'tk-24', workerId: 'u-danielan', categoryId: 'cat-3', serviceId: 'srv-9', serviceName: 'Hidratación con Ácido Hialurónico', price: 45, commissionRate: 50, date: '2026-07-05' },
-  { id: 'tk-25', workerId: 'u-danielan', categoryId: 'cat-1', serviceId: 'srv-4', serviceName: 'Peinado de Gala / Ondas', price: 40, commissionRate: 50, date: '2026-07-08' },
+  //{ id: 'tk-22', workerId: 'u-danielan', categoryId: 'cat-1', serviceId: 'srv-2', serviceName: 'Corte de Dama + Secado', price: 32, commissionRate: 50, date: '2026-07-01' },
   
   // Daniela Cuero
-  { id: 'tk-26', workerId: 'u-danielac', categoryId: 'cat-1', serviceId: 'srv-1', serviceName: 'Corte de Caballero + Lavado', price: 18, commissionRate: 50, date: '2026-07-01' },
-  { id: 'tk-27', workerId: 'u-danielac', categoryId: 'cat-1', serviceId: 'srv-3', serviceName: 'Arreglo de Barba con Navaja', price: 12, commissionRate: 50, date: '2026-07-02' },
-  { id: 'tk-28', workerId: 'u-danielac', categoryId: 'cat-1', serviceId: 'srv-1', serviceName: 'Corte de Caballero + Lavado', price: 18, commissionRate: 50, date: '2026-07-04' },
-  { id: 'tk-29', workerId: 'u-danielac', categoryId: 'cat-1', serviceId: 'srv-2', serviceName: 'Corte de Dama + Secado', price: 32, commissionRate: 50, date: '2026-07-06' },
-  { id: 'tk-30', workerId: 'u-danielac', categoryId: 'cat-2', serviceId: 'srv-5', serviceName: 'Tinte de Raíz', price: 35, commissionRate: 50, date: '2026-07-07' },
+  //{ id: 'tk-26', workerId: 'u-danielac', categoryId: 'cat-1', serviceId: 'srv-1', serviceName: 'Corte de Caballero + Lavado', price: 18, commissionRate: 50, date: '2026-07-01' },
   
   // Rafael
-  { id: 'tk-31', workerId: 'u-rafael', categoryId: 'cat-4', serviceId: 'srv-10', serviceName: 'Manicura Semipermanente', price: 25, commissionRate: 50, date: '2026-07-01' },
-  { id: 'tk-32', workerId: 'u-rafael', categoryId: 'cat-4', serviceId: 'srv-12', serviceName: 'Uñas de Gel Nuevas', price: 55, commissionRate: 50, date: '2026-07-03' },
-  { id: 'tk-33', workerId: 'u-rafael', categoryId: 'cat-4', serviceId: 'srv-11', serviceName: 'Pedicura Completa Estética', price: 35, commissionRate: 50, date: '2026-07-06' },
-  { id: 'tk-34', workerId: 'u-rafael', categoryId: 'cat-4', serviceId: 'srv-10', serviceName: 'Manicura Semipermanente', price: 25, commissionRate: 50, date: '2026-07-08' },
+  //{ id: 'tk-31', workerId: 'u-rafael', categoryId: 'cat-4', serviceId: 'srv-10', serviceName: 'Manicura Semipermanente', price: 25, commissionRate: 50, date: '2026-07-01' },
   
   // Naidy
-  { id: 'tk-35', workerId: 'u-naidy', categoryId: 'cat-1', serviceId: 'srv-2', serviceName: 'Corte de Dama + Secado', price: 32, commissionRate: 50, date: '2026-07-02' },
-  { id: 'tk-36', workerId: 'u-naidy', categoryId: 'cat-3', serviceId: 'srv-8', serviceName: 'Tratamiento de Queratina Profesional', price: 120, commissionRate: 50, date: '2026-07-04' },
-  { id: 'tk-37', workerId: 'u-naidy', categoryId: 'cat-2', serviceId: 'srv-7', serviceName: 'Matizador de Color', price: 25, commissionRate: 50, date: '2026-07-07' },
-];
+  //{ id: 'tk-35', workerId: 'u-naidy', categoryId: 'cat-1', serviceId: 'srv-2', serviceName: 'Corte de Dama + Secado', price: 32, commissionRate: 50, date: '2026-07-02' },
+ ];
